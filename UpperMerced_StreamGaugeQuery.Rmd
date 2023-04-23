@@ -1,0 +1,69 @@
+---
+title: "StreamGaugeQuery"
+output: html_document
+date: "2023-04-22"
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(dataRetrieval)
+library(ggsn)
+library(sf)
+library('maps')
+```
+```{r}
+readNWISpCode("all")
+#See that air temp in C is parameter code 00020. Let's start with that. 
+
+UM_gauges <- whatNWISsites(huc="18040008", 
+                          parameterCd='00020')
+nrow(UM_gauges)
+#there are 82 possible gauges in the Upper Merced
+
+names(UM_gauges)
+
+UM_gauges
+```
+
+```{r}
+getwd()
+
+# Unzip the shapefile
+unzip("WBD_18_HU2_Shape.zip")
+
+# Read in the shapefile with st_read()
+shapefile <- st_read("C:/Users/jessi/Desktop/SierraNevadaBeavers/SierraNevadaBeavers/Shape/WBDHU8.shp")
+
+# Select just the Upper Merced Watershed
+UM_boundary <- st_write(shapefile[shapefile$huc8=="18040008",], "UM_boundary.shp")
+
+
+
+UM_boundary <- st_transform()
+usa <- st_as_sf(maps::map("state", xlim = fill=TRUE, plot =FALSE),
+                  crs = 4269)
+
+?map
+help(package='maps')
+?st_as_sf
+
+sf_UM <- st_as_sf(UM_gauges, 
+                  coords = c("dec_long_va", "dec_lat_va"),
+                  crs = 4269)
+ggplot() +
+    geom_sf(data = usa[ usa$ID == "california" ,]) +
+    geom_sf(data = sf_UM) + 
+    xlab(NULL)+
+    ylab(NULL)+
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(sf_UM, symbol=10, location="bottomleft") +
+    scalebar(usa[ usa$ID == "california" ,],
+             dist=100, dist_unit="km", st.size = 3,
+             transform=TRUE, model="WGS84")
+```
+
+
