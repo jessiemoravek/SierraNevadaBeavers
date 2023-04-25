@@ -1,0 +1,93 @@
+---
+title: "UpperMerced_BeaverDamLocations"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(dataRetrieval)
+library(ggsn)
+library(sf)
+library(maps)
+```
+#Maps
+##Get UM boundary shapefile
+```{r}
+getwd()
+
+# Read in the shapefile with st_read()
+shapefile <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/SierraNevadaBeavers/UM_boundary.shp")
+
+#Project to California Teal Albers (NAD83) EPSG code 3310
+UM_boundary <- st_transform(shapefile, 3310)
+```
+##UM Boundary Map
+```{r}
+ggplot() +
+    geom_sf(data = UM_boundary) +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle("Upper Merced)") + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(UM_boundary, symbol=10, location="bottomright") + 
+    scalebar(UM_boundary,
+             dist=10, dist_unit="km", st.size = 3,
+             transform=FALSE)
+```
+
+#Import Practice Shapefile
+
+```{r}
+getwd()
+
+# Read in the shapefile with st_read()
+damCapClip <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/SierraNevadaBeavers/DamCapacity_Clip.shp")
+
+#remove unneeded shapefiles
+file.remove(list.files(pattern = "DamCapacity_Clip*",recursive = F))
+
+#Project to California Teal Albers (NAD83) EPSG code 3310
+damCapClip <- st_transform(damCapClip, 3310)
+```
+##Visualize
+```{r}
+ggplot() +
+    geom_sf(data = damCapClip) +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle("Dam Capacity Clipped Area") + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(damCapClip, symbol=10, location="bottomright") + 
+    scalebar(damCapClip,
+             dist=.5, dist_unit="km", st.size = 3,
+             transform=FALSE)
+```
+
+```{r}
+damCapClip
+#26 segments
+#type: LINESTRING
+str(damCapClip)
+```
+#Prep for Function
+```{r}
+damCoord <- damCapClip$geometry 
+#Extract the column with coordinates (not straightforward, in a weird format...)
+
+damCoord <- st_coordinates(damCapClip) %>% 
+    map(., function(x) {x[,1:2]}) 
+
+#create boundary points with 500-meter spacing 
+div.pts <- map(damCoord, function(x){evenspace(x, sample_dist)})  # here you call the evenspace function.
+
+length(div.pts) # this returns a MULTIPOINTS (or POINTS, if your input is LINESTRING), from which you can extract the coordinates. 
+```
+
+
+
