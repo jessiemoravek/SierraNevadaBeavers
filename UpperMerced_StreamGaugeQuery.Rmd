@@ -28,14 +28,6 @@ tempCodes <- pcode[grep("temperature",
 tempCodes
 #Temperature, air, degrees Celsius = 00020
 
-#precipitation codes
-precipCodes <- pcode[grep("precipitation",
-                      pcode$parameter_nm,
-                      ignore.case=TRUE),]
-
-precipCodes
-#Precipitation, mm = 99772
-#Precipitation, cumulative, mm = 72194
 ```
 #Temperature
 ##Count UM gauges
@@ -43,7 +35,7 @@ precipCodes
 UM_gauges <- whatNWISsites(huc="18040008", 
                           parameterCd='00020')
 nrow(UM_gauges)
-#there are 82 possible gauges in the Upper Merced
+#there are 72 possible gauges in the Upper Merced
 
 names(UM_gauges)
 
@@ -100,8 +92,170 @@ ggplot() +
 #Precipitation
 ##Count UM gauges
 ```{r}
-UM_gauges2 <- whatNWISsites(huc="18040009", 
-                          parameterCd='99772')
+#precipitation codes
+precipCodes <- pcode[grep("precipitation",
+                      pcode$parameter_nm,
+                      ignore.case=TRUE),]
+
+precipCodes
+#Precipitation, mm = 99772
+#Precipitation, cumulative, mm = 72194
+```
+
+```{r}
+UM_gauges2 <- whatNWISsites(huc="18040008", 
+                          parameterCd='00117')
 #No gauges in the Upper Merced that measure precipitation...
 
+```
+#Humidity
+##Count UM Gauges
+```{r}
+humidCodes<- pcode[grep("humidity",
+                      pcode$parameter_nm,
+                      ignore.case=TRUE),]
+humidCodes
+#Relative humidity, % = 00052
+```
+
+```{r}
+UM_gauges3 <- whatNWISsites(huc="18040008", 
+                          parameterCd='00052')
+#no humidity gauge
+
+```
+
+#Wind
+##Count UM Gauges
+```{r}
+windCodes <- pcode[grep("wind",
+                      pcode$parameter_nm,
+                      ignore.case=TRUE),]
+
+windCodes
+#Wind speed (m/s) = 62625
+```
+
+```{r}
+UM_gauges4 <- whatNWISsites(huc="18040008", 
+                          parameterCd='00035')
+#1 wind gauges
+```
+
+##Transform gauge point data
+```{r}
+#Make the gauges point file into a sf object. Note that in the st_as_sf function, crs needs to the projection the file is ALREADY IN, not the projection you want. Specify the projection you want using st_transform
+sf_UM4 <- st_as_sf(UM_gauges4, 
+                  coords = c("dec_long_va", "dec_lat_va"),
+                  crs = 4269)
+
+#Reproject gauge points
+sf_UM4 <- st_transform(sf_UM4, 3310)
+```
+
+##Map
+```{r}
+ggplot() +
+    geom_sf(data = UM_boundary) +
+    geom_sf(data = sf_UM5, color = "red", show.legend=T) + 
+    geom_sf(data = sf_UM, color = "black", show.legend=T) +
+    geom_sf(data = sf_UM4, color = "blue", show.legend=T) +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle("Barometric Pressure Gauge Locations (n = 84) \n Air Temperature Gauge Locations (n = 72) \n Wind Gauge Locations (n = 1)") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(sf_UM, symbol=10, location="bottomright") + 
+    scalebar(UM_boundary,
+             dist=10, dist_unit="km", st.size = 3,
+             transform=FALSE)
+```
+
+
+#Pressure
+##Count UM Gauges
+```{r}
+pressureCodes <- pcode[grep("pressure",
+                      pcode$parameter_nm,
+                      ignore.case=TRUE),]
+
+pressureCodes
+#Barometric Pressure, millimeters of mercury = 00025
+```
+
+```{r}
+UM_gauges5 <- whatNWISsites(huc="18040008", 
+                          parameterCd='00025')
+#84 surface pressure sites
+```
+##Transform gauge point data
+```{r}
+#Make the gauges point file into a sf object. Note that in the st_as_sf function, crs needs to the projection the file is ALREADY IN, not the projection you want. Specify the projection you want using st_transform
+sf_UM5 <- st_as_sf(UM_gauges5, 
+                  coords = c("dec_long_va", "dec_lat_va"),
+                  crs = 4269)
+
+#Reproject gauge points
+sf_UM5 <- st_transform(sf_UM5, 3310)
+```
+
+##Map
+
+```{r}
+ggplot() +
+    geom_sf(data = UM_boundary) +
+    geom_sf(data = sf_UM5, color = "red", show.legend=T) + 
+    geom_sf(data = sf_UM, color = "black", show.legend=T) +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle("Barometric Pressure Gauge Locations (n = 84) \n Air Temperature Gauge Locations (n = 72)") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(sf_UM, symbol=10, location="bottomright") + 
+    scalebar(UM_boundary,
+             dist=10, dist_unit="km", st.size = 3,
+             transform=FALSE)
+```
+
+
+#Radiation
+##Count UM Gauges
+```{r}
+radCodes <- pcode[grep("radiation",
+                      pcode$parameter_nm,
+                      ignore.case=TRUE),]
+
+radCodes
+#Shortwave radiation, downward intensity, watts per square meter = 72186	
+#Longwave radiation, downward intensity, watts per square meter	= 72175
+```
+
+```{r}
+UM_gauges6 <- whatNWISsites(huc="18040008", 
+                          parameterCd='72186')
+#No SW raditation 
+
+UM_gauges7 <- whatNWISsites(huc="18040008", 
+                          parameterCd='72175')
+
+#No LW radiation
+```
+
+#Evaporation
+##Count UM Gauges
+```{r}
+evapCodes <- pcode[grep("evaporation",
+                      pcode$parameter_nm,
+                      ignore.case=TRUE),]
+
+evapCodes
+#Evaporation per recording interval, millimeters= 72200
+```
+
+```{r}
+UM_gauges8 <- whatNWISsites(huc="18040008", 
+                          parameterCd='72200')
+#No evap gauges
 ```
