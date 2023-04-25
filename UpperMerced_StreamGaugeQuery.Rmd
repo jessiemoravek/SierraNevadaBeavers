@@ -11,8 +11,10 @@ library(dplyr)
 library(dataRetrieval)
 library(ggsn)
 library(sf)
-library('maps')
+library(maps)
+library(cder)
 ```
+#USGS
 #Search for relevant parameters
 ##NLDAS parameters
   
@@ -42,53 +44,6 @@ names(UM_gauges)
 UM_gauges
 ```
 
-##Get UM boundary shapefile
-```{r}
-getwd()
-
-# Unzip the shapefile
-#unzip("WBD_18_HU2_Shape.zip")
-
-# Read in the shapefile with st_read()
-shapefile <- st_read("C:/Users/jessi/Desktop/SierraNevadaBeavers/SierraNevadaBeavers/Shape/WBDHU8.shp")
-
-# Select just the Upper Merced Watershed
-UM_boundary <- st_write(shapefile[shapefile$huc8=="18040008",], "UM_boundary.shp", append = FALSE)
-
-#remove unneeded shapefiles
-file.remove(list.files(pattern = "WBD_18_HU2_Shape*",recursive = F))
-
-#Project to California Teal Albers (NAD83) EPSG code 3310
-UM_boundary <- st_transform(UM_boundary, 3310)
-```
-
-##Transform gauge point data
-```{r}
-#Make the gauges point file into a sf object. Note that in the st_as_sf function, crs needs to the projection the file is ALREADY IN, not the projection you want. Specify the projection you want using st_transform
-sf_UM <- st_as_sf(UM_gauges, 
-                  coords = c("dec_long_va", "dec_lat_va"),
-                  crs = 4269)
-
-#Reproject gauge points
-sf_UM <- st_transform(sf_UM, 3310)
-```
-
-##Map
-```{r}
-ggplot() +
-    geom_sf(data = UM_boundary) +
-    geom_sf(data = sf_UM) + 
-    xlab(NULL)+
-    ylab(NULL)+
-    ggtitle("Upper Merced: Air Temp (C) Gauge Locations (n = 72)") + 
-    theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5),
-          plot.subtitle = element_text(hjust = 0.5)) +
-    north(sf_UM, symbol=10, location="bottomright") + 
-    scalebar(UM_boundary,
-             dist=10, dist_unit="km", st.size = 3,
-             transform=FALSE)
-```
 #Precipitation
 ##Count UM gauges
 ```{r}
@@ -100,12 +55,13 @@ precipCodes <- pcode[grep("precipitation",
 precipCodes
 #Precipitation, mm = 99772
 #Precipitation, cumulative, mm = 72194
+
+precipCodesAll <- precipCodes[,"parameter_cd"]
 ```
 
 ```{r}
 UM_gauges2 <- whatNWISsites(huc="18040008", 
-                          parameterCd='00117')
-#No gauges in the Upper Merced that measure precipitation...
+                          parameterCd=precipCodesAll)
 
 ```
 #Humidity
@@ -142,37 +98,6 @@ UM_gauges4 <- whatNWISsites(huc="18040008",
 #1 wind gauges
 ```
 
-##Transform gauge point data
-```{r}
-#Make the gauges point file into a sf object. Note that in the st_as_sf function, crs needs to the projection the file is ALREADY IN, not the projection you want. Specify the projection you want using st_transform
-sf_UM4 <- st_as_sf(UM_gauges4, 
-                  coords = c("dec_long_va", "dec_lat_va"),
-                  crs = 4269)
-
-#Reproject gauge points
-sf_UM4 <- st_transform(sf_UM4, 3310)
-```
-
-##Map
-```{r}
-ggplot() +
-    geom_sf(data = UM_boundary) +
-    geom_sf(data = sf_UM5, color = "red", show.legend=T) + 
-    geom_sf(data = sf_UM, color = "black", show.legend=T) +
-    geom_sf(data = sf_UM4, color = "blue", show.legend=T) +
-    xlab(NULL)+
-    ylab(NULL)+
-    ggtitle("Barometric Pressure Gauge Locations (n = 84) \n Air Temperature Gauge Locations (n = 72) \n Wind Gauge Locations (n = 1)") +
-    theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5),
-          plot.subtitle = element_text(hjust = 0.5)) +
-    north(sf_UM, symbol=10, location="bottomright") + 
-    scalebar(UM_boundary,
-             dist=10, dist_unit="km", st.size = 3,
-             transform=FALSE)
-```
-
-
 #Pressure
 ##Count UM Gauges
 ```{r}
@@ -189,36 +114,6 @@ UM_gauges5 <- whatNWISsites(huc="18040008",
                           parameterCd='00025')
 #84 surface pressure sites
 ```
-##Transform gauge point data
-```{r}
-#Make the gauges point file into a sf object. Note that in the st_as_sf function, crs needs to the projection the file is ALREADY IN, not the projection you want. Specify the projection you want using st_transform
-sf_UM5 <- st_as_sf(UM_gauges5, 
-                  coords = c("dec_long_va", "dec_lat_va"),
-                  crs = 4269)
-
-#Reproject gauge points
-sf_UM5 <- st_transform(sf_UM5, 3310)
-```
-
-##Map
-
-```{r}
-ggplot() +
-    geom_sf(data = UM_boundary) +
-    geom_sf(data = sf_UM5, color = "red", show.legend=T) + 
-    geom_sf(data = sf_UM, color = "black", show.legend=T) +
-    xlab(NULL)+
-    ylab(NULL)+
-    ggtitle("Barometric Pressure Gauge Locations (n = 84) \n Air Temperature Gauge Locations (n = 72)") +
-    theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5),
-          plot.subtitle = element_text(hjust = 0.5)) +
-    north(sf_UM, symbol=10, location="bottomright") + 
-    scalebar(UM_boundary,
-             dist=10, dist_unit="km", st.size = 3,
-             transform=FALSE)
-```
-
 
 #Radiation
 ##Count UM Gauges
@@ -230,6 +125,9 @@ radCodes <- pcode[grep("radiation",
 radCodes
 #Shortwave radiation, downward intensity, watts per square meter = 72186	
 #Longwave radiation, downward intensity, watts per square meter	= 72175
+
+radCodesAll <- radCodes[,"parameter_cd"]
+
 ```
 
 ```{r}
@@ -252,10 +150,159 @@ evapCodes <- pcode[grep("evaporation",
 
 evapCodes
 #Evaporation per recording interval, millimeters= 72200
+
+evapCodesAll <- evapCodes[,"parameter_cd"]
+
 ```
 
 ```{r}
 UM_gauges8 <- whatNWISsites(huc="18040008", 
-                          parameterCd='72200')
+                          parameterCd=evapCodesAll)
 #No evap gauges
 ```
+
+#Maps
+##Get UM boundary shapefile
+```{r}
+getwd()
+
+# Unzip the shapefile
+#unzip("WBD_18_HU2_Shape.zip")
+
+# Read in the shapefile with st_read()
+shapefile <- st_read("C:/Users/jessi/Desktop/SierraNevadaBeavers/SierraNevadaBeavers/Shape/WBDHU8.shp")
+
+# Select just the Upper Merced Watershed
+UM_boundary <- st_write(shapefile[shapefile$huc8=="18040008",], "UM_boundary.shp", append = FALSE)
+
+#remove unneeded shapefiles
+file.remove(list.files(pattern = "WBD_18_HU2_Shape*",recursive = F))
+
+#Project to California Teal Albers (NAD83) EPSG code 3310
+UM_boundary <- st_transform(UM_boundary, 3310)
+```
+##UM Boundary Map
+```{r}
+ggplot() +
+    geom_sf(data = UM_boundary) +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle("Upper Merced)") + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(sf_UM, symbol=10, location="bottomright") + 
+    scalebar(UM_boundary,
+             dist=10, dist_unit="km", st.size = 3,
+             transform=FALSE)
+```
+##Transform gauge point data
+```{r}
+#Make the gauges point file into a sf object. Note that in the st_as_sf function, crs needs to the projection the file is ALREADY IN, not the projection you want. Specify the projection you want using st_transform
+sf_UM <- st_as_sf(UM_gauges, 
+                  coords = c("dec_long_va", "dec_lat_va"),
+                  crs = 4269)
+
+#Reproject gauge points
+sf_UM <- st_transform(sf_UM, 3310)
+```
+##Transform gauge point data
+```{r}
+#Make the gauges point file into a sf object. Note that in the st_as_sf function, crs needs to the projection the file is ALREADY IN, not the projection you want. Specify the projection you want using st_transform
+sf_UM4 <- st_as_sf(UM_gauges4, 
+                  coords = c("dec_long_va", "dec_lat_va"),
+                  crs = 4269)
+
+#Reproject gauge points
+sf_UM4 <- st_transform(sf_UM4, 3310)
+```
+
+##Transform gauge point data
+```{r}
+#Make the gauges point file into a sf object. Note that in the st_as_sf function, crs needs to the projection the file is ALREADY IN, not the projection you want. Specify the projection you want using st_transform
+sf_UM5 <- st_as_sf(UM_gauges5, 
+                  coords = c("dec_long_va", "dec_lat_va"),
+                  crs = 4269)
+
+#Reproject gauge points
+sf_UM5 <- st_transform(sf_UM5, 3310)
+```
+
+##Map
+```{r}
+ggplot() +
+    geom_sf(data = UM_boundary) +
+    geom_sf(data = sf_UM5, color = "red", show.legend=T) + 
+    geom_sf(data = sf_UM, color = "black", show.legend=T) +
+    geom_sf(data = sf_UM4, color = "blue", show.legend=T) +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle("Barometric Pressure Gauge Locations (n = 84) \n Air Temperature Gauge Locations (n = 72) \n Wind Gauge Locations (n = 1)") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(sf_UM, symbol=10, location="bottomright") + 
+    scalebar(UM_boundary,
+             dist=10, dist_unit="km", st.size = 3,
+             transform=FALSE)
+```
+
+#CDEC
+##Import station data
+```{r}
+cdecStations <- read.csv("Station_Search_CDEC.csv")
+```
+##Transform location data
+```{r}
+#Make the gauges point file into a sf object. Note that in the st_as_sf function, crs needs to the projection the file is ALREADY IN, not the projection you want. Specify the projection you want using st_transform
+cdecStations <- st_as_sf(cdecStations, 
+                  coords = c("Longitude", "Latitude"),
+                  crs = 4326)
+
+#Reproject gauge points
+cdecStations <- st_transform(cdecStations, 3310)
+```
+##Map
+```{r}
+ggplot() +
+    geom_sf(data = UM_boundary) +
+    geom_sf(data = cdecStations) + 
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle("CDEC stations") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(sf_UM, symbol=10, location="bottomright") + 
+    scalebar(UM_boundary,
+             dist=10, dist_unit="km", st.size = 3,
+             transform=FALSE)
+```
+##Clip to UM boundary
+```{r}
+UM_cdec <- st_intersection(UM_boundary,cdecStations)
+
+ggplot() +
+    geom_sf(data = UM_boundary) +
+    geom_sf(data = UM_cdec) + 
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle("CDEC stations") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(sf_UM, symbol=10, location="bottomright") + 
+    scalebar(UM_boundary,
+             dist=10, dist_unit="km", st.size = 3,
+             transform=FALSE)
+```
+
+
+#CDEC with R
+```{r}
+cdec_search_groups('Merced')
+?cdec_search_groups
+
+```
+
+
