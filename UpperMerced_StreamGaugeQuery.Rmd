@@ -300,9 +300,9 @@ ggplot() +
 
 #CDEC with R
 ```{r}
-cdec_search_groups('Merced')
-?cdec_search_groups
-
+#install.packages('CDECretrieve')
+#CDECretrieve doesn't work with this version of R
+#EPW (el portal), GIN, DGH, CFL, STR
 ```
 
 
