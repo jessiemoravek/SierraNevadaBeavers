@@ -12,7 +12,7 @@ library(dataRetrieval)
 library(ggsn)
 library(sf)
 library(maps)
-library(cder)
+
 ```
 #USGS
 #Search for relevant parameters
@@ -300,9 +300,10 @@ ggplot() +
 
 #CDEC with R
 ```{r}
-#install.packages('CDECretrieve')
-#CDECretrieve doesn't work with this version of R
-#EPW (el portal), GIN, DGH, CFL, STR
+station = "EPW"
+duration = "event" # or "E"
+
+cdec_query(station, sensor, duration, start.date, end.date)
 ```
 
 

@@ -58,13 +58,16 @@ ggplot() +
 getwd()
 
 # Read in the shapefile with st_read()
-damCapClip <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/SierraNevadaBeavers/DamCapacity_Clip.shp")
+#damCapClip <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity_Clip.shp")
 
 #remove unneeded shapefiles
-file.remove(list.files(pattern = "DamCapacity_Clip*",recursive = F))
+#file.remove(list.files(pattern = "DamCapacity_Clip*",recursive = F))
 
 #Project to California Teal Albers (NAD83) EPSG code 3310
-damCapClip <- st_transform(damCapClip, 3310)
+#damCapClip <- st_transform(damCapClip, 3310)
+
+saveRDS(damCapClip,"damCapClip.shp")
+damCapClip <- readRDS("damCapClip.shp")
 ```
 ##Visualize
 ```{r}
