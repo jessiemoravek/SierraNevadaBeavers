@@ -92,15 +92,38 @@ damCapClip
 str(damCapClip)
 ```
 #Prep for Function
+##Extract starting coordinates
 ```{r}
-damCoord <- damCapClip$geometry 
-#Extract the column with coordinates (not straightforward, in a weird format...)
+#Extract the start points of each stream segment
+pts <- st_line_sample(damCapClip, sample = 0)
 
-damCoord <- st_coordinates(damCapClip) %>% 
-    map(., function(x) {x[,1:2]}) 
+```
 
+```{r}
+ggplot() +
+    geom_sf(data = damCapClip) +
+    geom_sf(data = pts)+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle("Dam Capacity Clipped Area") + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(damCapClip, symbol=10, location="bottomright") + 
+    scalebar(damCapClip,
+             dist=.5, dist_unit="km", st.size = 3,
+             transform=FALSE)
+```
+##Create damdist for loop
+```{r}
 #create boundary points with 500-meter spacing 
-div.pts <- map(damCoord, function(x){evenspace(x, sample_dist)})  # here you call the evenspace function.
+for (i in damCapClip){
+  damdist <- ((damCapClip$iGeo_Len)*0.001)/(damCapClip$mCC_EX_CT)
+  div.pts <- purrr::map(pts, function(x){evenspace(x, damdist)}) 
+}
+  damSubset <- st_coordinates(damCapClip)
+  damCoord <- damSubset[,1:2]   
+ # here you call the evenspace function.
 
 length(div.pts) # this returns a MULTIPOINTS (or POINTS, if your input is LINESTRING), from which you can extract the coordinates. 
 ```

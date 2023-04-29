@@ -32,3 +32,4 @@ evenspace <- function(xy, sep, start=0){
   
   return(pos[,c("x","y","x0","y0","x1","y1","theta")])
 }
+
