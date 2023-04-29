@@ -1,0 +1,114 @@
+---
+title: "UpperMerced_Volumes"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(dataRetrieval)
+library(ggsn)
+library(sf)
+library(maps)
+```
+
+#Maps
+##Get UM boundary shapefile
+```{r}
+getwd()
+
+# Unzip the shapefile
+#unzip("WBD_18_HU2_Shape.zip")
+
+# Read in the shapefile with st_read()
+#shapefile <- st_read("C:/Users/jessi/Desktop/SierraNevadaBeavers/SierraNevadaBeavers/Shape/WBDHU8.shp")
+
+# Select just the Upper Merced Watershed
+#UM_boundary <- st_write(shapefile[shapefile$huc8=="18040008",], "UM_boundary.shp", append = FALSE)
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "WBD_18_HU2_Shape*",recursive = F))
+
+#Project to California Teal Albers (NAD83) EPSG code 3310
+#UM_boundary <- st_transform(UM_boundary, 3310)
+
+#saveRDS(UM_boundary,"UM_boundary")
+UM_boundary <- readRDS("UM_boundary")
+
+```
+##UM Boundary Map
+```{r}
+ggplot() +
+    geom_sf(data = UM_boundary) +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle("Upper Merced)") + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(UM_boundary, symbol=10, location="bottomright") + 
+    scalebar(UM_boundary,
+             dist=10, dist_unit="km", st.size = 3,
+             transform=FALSE)
+```
+
+
+#Import Practice Shapefile
+
+```{r}
+getwd()
+
+# Read in the shapefile with st_read()
+#damCapClip <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity_Clip.shp")
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "DamCapacity_Clip*",recursive = F))
+
+#Project to California Teal Albers (NAD83) EPSG code 3310
+#damCapClip <- st_transform(damCapClip, 3310)
+
+#saveRDS(damCapClip,"damCapClip.shp")
+damCapClip <- readRDS("damCapClip.shp")
+```
+##Visualize
+```{r}
+ggplot() +
+    geom_sf(data = damCapClip) +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle("Dam Capacity Clipped Area") + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(damCapClip, symbol=10, location="bottomright") + 
+    scalebar(damCapClip,
+             dist=.5, dist_unit="km", st.size = 3,
+             transform=FALSE)
+```
+
+
+##Attribute table
+```{r}
+damCapClip
+names(damCapClip)
+damCapClip$iGeo_Slope
+
+```
+#Volume calculation
+```{r}
+dataTable <- damCapClip
+for (i in dataTable){
+  slope <- dataTable$iGeo_Slope
+  da <- dataTable$iGeo_DA
+  width <- ifelse(da < 4.95,2.18*(da)^0.191,
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183))
+  length <- 1/slope
+  maxLength<- (dataTable$iGeo_Len/dataTable$mCC_EX_CT)
+  volume <- ifelse(length < maxLength, 0.5*1*(width)*(length),1*(width)*(maxLength))
+  dataTable$width <- width
+  dataTable$volume <- volume
+  print(dataTable)
+}                   
+```
+
