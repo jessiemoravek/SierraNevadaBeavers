@@ -90,31 +90,31 @@ ggplot() +
 
 ##Attribute table
 ```{r}
-damCapClip
 names(damCapClip)
 damCapClip$iGeo_Slope
-
 ```
-#Volume calculation
+#Volume and Surface Area calculation
 ```{r}
 damCapClip_v <- damCapClip
 for (i in damCapClip_v){
-  slope <- damCapClip_v$iGeo_Slope
-  da <- damCapClip_v$iGeo_DA
+  slope <- damCapClip_v$iGeo_Slope #meters
+  da <- damCapClip_v$iGeo_DA #m2
   width <- ifelse(da < 4.95,2.18*(da)^0.191,
                   ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183))
   length <- 1/slope
   maxLength<- (damCapClip_v$iGeo_Len/damCapClip_v$mCC_EX_CT)
   volume <- ifelse(length < maxLength, 0.5*1*(width)*(length),1*(width)*(maxLength))
+  surfaceArea <- ifelse(length < maxLength, (width)*(length),(width)*(maxLength))
   damCapClip_v$width <- width
-  damCapClip_v$volume <- volume
+  damCapClip_v$volume <- volume #m3
+  damCapClip_v$surfaceArea <- surfaceArea #m2
 } 
 
 saveRDS(damCapClip_v,"damCapClip_v.rds")
 ```
 
 
-#Create 1km grid
+##Create 1km grid
 ```{r}
 #Check if sf object is in metric CRS (i.e. projected)
 st_is_longlat(damCapClip)
@@ -131,25 +131,9 @@ grid1 <- mutate(grid1, id = 1:nrow(grid1))
 ```
 
 
-```{r}
-ggplot() +
-    geom_sf(data = grid1, fill = NA)+
-    geom_sf(data = damCapClip, col = "blue") +
-    xlab(NULL)+
-    ylab(NULL)+
-    ggtitle("Dam Capacity Clipped Area") + 
-    theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5),
-          plot.subtitle = element_text(hjust = 0.5), 
-          panel.grid.major = element_line(colour = "transparent")) +
-    north(damCapClip, symbol=10, location="bottomright") + 
-    scalebar(damCapClip,
-             dist=.5, dist_unit="km", st.size = 3,
-             transform=FALSE)
 
-```
 
-##Intersecting lines
+##Volume by grid cell
 ```{r}
 intersection <- st_intersection(grid1, damCapClip_v) %>% 
   mutate(length = st_length(.)) %>% #creates a "length" column that is the length of that particular segment in the grid cell from the "id" column
@@ -161,7 +145,70 @@ grid1 <- grid1 %>%
 vol_by_grid <- grid1 %>% 
   mutate(percent_len_in_cell = length/iGeo_Len) %>% 
   mutate(segment_vol_in_cell = percent_len_in_cell*volume) %>% 
-  group_by(id) %>% summarize(total_vol_in_cell = mean(segment_vol_in_cell))
+  group_by(id) %>% summarize(total_vol_in_cell = sum(segment_vol_in_cell))
 
 vol_by_grid
+vol_by_grid$total_vol_in_cell <- as.numeric(vol_by_grid$total_vol_in_cell) #convert volume col to numeric
 ```
+```{r}
+ggplot() +
+    geom_sf(data = vol_by_grid, aes(fill = total_vol_in_cell), color = NA) +
+    geom_sf(data = damCapClip, col = "blue") +
+    scale_fill_gradient2(low = "#132B43", high = "#078FF7") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Volume per ", km^2))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapClip, symbol=10, location="bottomleft") + 
+    scalebar(vol_by_grid,
+             dist=.5, dist_unit="km", st.size = 3, transform= F) +
+    guides(fill = guide_colorbar(title = expression(paste(m^3)),
+                             title.position = "bottom",
+                             title.theme = element_text(size = 10,
+                                                        colour = "gray70",
+                                                        angle = 0)))
+
+median(vol_by_grid$total_vol_in_cell,na.rm=T)
+```
+
+##Surface Area by grid cell
+```{r}
+#use grid1 (after doing the leftjoin above for volume calculations)
+
+sa_by_grid <- grid1 %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_sa_in_cell = percent_len_in_cell*surfaceArea) %>% 
+  group_by(id) %>% summarize(total_sa_in_cell = sum(segment_sa_in_cell))
+
+sa_by_grid
+sa_by_grid$total_sa_in_cell <- as.numeric(sa_by_grid$total_sa_in_cell) #convert volume col to numeric
+```
+
+```{r}
+ggplot() +
+    geom_sf(data = sa_by_grid, aes(fill = total_sa_in_cell), color = NA) +
+    geom_sf(data = damCapClip, col = "blue") +
+    scale_fill_gradient2(low = "#43132B", high = "#F7078F") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Surface Area per ", km^2))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapClip, symbol=10, location="bottomleft") + 
+    scalebar(vol_by_grid,
+             dist=.5, dist_unit="km", st.size = 3, transform= F) +
+    guides(fill = guide_colorbar(title = expression(paste(m^2)),
+                             title.position = "bottom",
+                             title.theme = element_text(size = 10,
+                                                        colour = "gray70",
+                                                        angle = 0)))
+
+median(vol_by_grid$total_vol_in_cell,na.rm=T)
+```
+
+
