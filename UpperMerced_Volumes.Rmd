@@ -158,10 +158,10 @@ intersection <- st_intersection(grid1, damCapClip_v) %>%
 grid1 <- grid1 %>% 
   left_join(intersection, by = "id")
 
-grid1 <- grid1 %>% 
+vol_by_grid <- grid1 %>% 
   mutate(percent_len_in_cell = length/iGeo_Len) %>% 
   mutate(segment_vol_in_cell = percent_len_in_cell*volume) %>% 
-  mutate(total_vol_in_cell = summarize(total_vol_in_cell = mean(segment_vol_in_cell)))
+  group_by(id) %>% summarize(total_vol_in_cell = mean(segment_vol_in_cell))
 
-
+vol_by_grid
 ```
