@@ -32,7 +32,7 @@ getwd()
 #Project to California Teal Albers (NAD83) EPSG code 3310
 #UM_boundary <- st_transform(UM_boundary, 3310)
 
-saveRDS(UM_boundary,"UM_boundary")
+#saveRDS(UM_boundary,"UM_boundary")
 UM_boundary <- readRDS("UM_boundary")
 
 ```
@@ -66,7 +66,7 @@ getwd()
 #Project to California Teal Albers (NAD83) EPSG code 3310
 #damCapClip <- st_transform(damCapClip, 3310)
 
-saveRDS(damCapClip,"damCapClip.shp")
+#saveRDS(damCapClip,"damCapClip.shp")
 damCapClip <- readRDS("damCapClip.shp")
 ```
 ##Visualize
@@ -129,4 +129,17 @@ length(div.pts) # this returns a MULTIPOINTS (or POINTS, if your input is LINEST
 ```
 
 
+
+
+##Intersecting lines
+```{r}
+intersection <- st_intersection(grid1, damCapClip) %>% 
+  mutate(length = st_length(.)) %>% 
+  st_drop_geometry() # complicates things in joins later on
+
+grid1 <- grid1 %>% 
+  left_join(intersection, by = "id")
+
+plot(grid1["length"])
+```
 

@@ -97,18 +97,71 @@ damCapClip$iGeo_Slope
 ```
 #Volume calculation
 ```{r}
-dataTable <- damCapClip
-for (i in dataTable){
-  slope <- dataTable$iGeo_Slope
-  da <- dataTable$iGeo_DA
+damCapClip_v <- damCapClip
+for (i in damCapClip_v){
+  slope <- damCapClip_v$iGeo_Slope
+  da <- damCapClip_v$iGeo_DA
   width <- ifelse(da < 4.95,2.18*(da)^0.191,
                   ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183))
   length <- 1/slope
-  maxLength<- (dataTable$iGeo_Len/dataTable$mCC_EX_CT)
+  maxLength<- (damCapClip_v$iGeo_Len/damCapClip_v$mCC_EX_CT)
   volume <- ifelse(length < maxLength, 0.5*1*(width)*(length),1*(width)*(maxLength))
-  dataTable$width <- width
-  dataTable$volume <- volume
-  print(dataTable)
-}                   
+  damCapClip_v$width <- width
+  damCapClip_v$volume <- volume
+} 
+
+saveRDS(damCapClip_v,"damCapClip_v.rds")
 ```
 
+
+#Create 1km grid
+```{r}
+#Check if sf object is in metric CRS (i.e. projected)
+st_is_longlat(damCapClip)
+#st_is_longlat returns "False" which means that the object damCapClip is in a metric CRS
+
+#CRS 3310 is in units of meters (see here https://epsg.io/3310)
+grid_spacing <- 1000 
+
+grid1 <- st_make_grid(damCapClip, square = T, cellsize = c(grid_spacing, grid_spacing)) %>% # the grid, covering bounding box
+  st_sf()
+
+#add an id column
+grid1 <- mutate(grid1, id = 1:nrow(grid1))
+```
+
+
+```{r}
+ggplot() +
+    geom_sf(data = grid1, fill = NA)+
+    geom_sf(data = damCapClip, col = "blue") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle("Dam Capacity Clipped Area") + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapClip, symbol=10, location="bottomright") + 
+    scalebar(damCapClip,
+             dist=.5, dist_unit="km", st.size = 3,
+             transform=FALSE)
+
+```
+
+##Intersecting lines
+```{r}
+intersection <- st_intersection(grid1, damCapClip_v) %>% 
+  mutate(length = st_length(.)) %>% #creates a "length" column that is the length of that particular segment in the grid cell from the "id" column
+  st_drop_geometry() # complicates things in joins later on
+
+grid1 <- grid1 %>% 
+  left_join(intersection, by = "id")
+
+grid1 <- grid1 %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_vol_in_cell = percent_len_in_cell*volume) %>% 
+  mutate(total_vol_in_cell = summarize(total_vol_in_cell = mean(segment_vol_in_cell)))
+
+
+```
