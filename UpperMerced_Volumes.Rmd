@@ -319,7 +319,7 @@ vol_by_grid2$total_vol_in_cell <- as.numeric(vol_by_grid2$total_vol_in_cell) #co
 ggplot() +
     geom_sf(data = vol_by_grid2, aes(fill = total_vol_in_cell), color = NA) +
     geom_sf(data = damCapacity, col = "blue") +
-    scale_fill_gradient2(low = "#132B43", high = "#078FF7") +
+    scale_fill_gradient2(limits = c(0,150), low = "#132B43", high = "#078FF7") +
     xlab(NULL)+
     ylab(NULL)+
     ggtitle( expression(paste("Volume per ", km^2))) + 
@@ -329,13 +329,13 @@ ggplot() +
           panel.grid.major = element_line(colour = "transparent")) +
     north(damCapacity, symbol=10, location="bottomleft") + 
     scalebar(vol_by_grid2,
-             dist=.5, dist_unit="km", st.size = 3, transform= F) +
+             dist=20, dist_unit="km", st.size = 3, transform= F) +
     guides(fill = guide_colorbar(title = expression(paste(m^3)),
                              title.position = "bottom",
                              title.theme = element_text(size = 10,
                                                         colour = "gray70",
                                                         angle = 0)))
-
+0:150
 ?scale_fill_gradient2
 summary(vol_by_grid2$total_vol_in_cell,na.rm=T)
 ```
