@@ -211,4 +211,131 @@ ggplot() +
 median(vol_by_grid$total_vol_in_cell,na.rm=T)
 ```
 
+#Upper Merced
+##Bounding Box
+```{r}
+#This box aligns with this LIS model coordinates
+getwd()
 
+# Read in the shapefile with st_read()
+boundingBox <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/BoundingBox.shp")
+
+#remove unneeded shapefiles
+file.remove(list.files(pattern = "BoundingBox*",recursive = F))
+
+#Project to California Teal Albers (NAD83) EPSG code 3310
+boundingBox <- st_transform(boundingBox, 3310)
+
+saveRDS(boundingBox,"boundingBox")
+boundingBox <- readRDS("boundingBox")
+```
+##Dam Capacity
+```{r}
+#This box aligns with this LIS model coordinates
+getwd()
+
+# Read in the shapefile with st_read()
+damCapacity <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity.shp")
+
+#remove unneeded shapefiles
+file.remove(list.files(pattern = "damCapacity*",recursive = F))
+
+#Project to California Teal Albers (NAD83) EPSG code 3310
+damCapacity <- st_transform(damCapacity, 3310)
+
+saveRDS(damCapacity,"damCapacity")
+damCapacity <- readRDS("damCapacity")
+```
+##Create 1km grid
+```{r}
+#Check if sf object is in metric CRS (i.e. projected)
+st_is_longlat(boundingBox)
+#st_is_longlat returns "False" which means that the object is in a metric CRS
+
+#CRS 3310 is in units of meters (see here https://epsg.io/3310)
+grid_spacing <- 1000 
+
+grid2 <- st_make_grid(boundingBox, square = T, cellsize = c(grid_spacing, grid_spacing)) %>% # the grid, covering bounding box
+  st_sf()
+
+#add an id column
+grid2 <- mutate(grid2, id = 1:nrow(grid2))
+```
+
+##Map
+```{r}
+ggplot() +
+    geom_sf(data = grid2, fill = NA) +
+    geom_sf(data = damCapacity, col = "blue") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Upper Merced 1km Grid"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapacity, symbol=10, location="bottomright") + 
+    scalebar(damCapacity,
+             dist=10, dist_unit="km", st.size = 3, transform= F) 
+```
+##Volume and Surface Area calculation
+```{r}
+damCapacity_v <- damCapacity
+for (i in damCapacity_v){
+  slope <- damCapacity_v$iGeo_Slope #meters
+  da <- damCapacity_v$iGeo_DA #m2
+  width <- ifelse(da < 4.95,2.18*(da)^0.191,
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183))
+  length <- 1/slope
+  maxLength<- (damCapacity_v$iGeo_Len/damCapacity_v$mCC_EX_CT)
+  volume <- ifelse(length < maxLength, 0.5*1*(width)*(length),1*(width)*(maxLength))
+  surfaceArea <- ifelse(length < maxLength, (width)*(length),(width)*(maxLength))
+  damCapacity_v$width <- width
+  damCapacity_v$volume <- volume #m3
+  damCapacity_v$surfaceArea <- surfaceArea #m2
+} 
+
+saveRDS(damCapacity_v,"damCapacity_v.rds")
+```
+
+##Volume by grid cell
+```{r}
+intersection2 <- st_intersection(grid2, damCapacity_v) %>% 
+  mutate(length = st_length(.)) %>% #creates a "length" column that is the length of that particular segment in the grid cell from the "id" column
+  st_drop_geometry() # complicates things in joins later on
+
+grid2 <- grid2 %>% 
+  left_join(intersection2, by = "id")
+
+vol_by_grid2 <- grid2 %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_vol_in_cell = percent_len_in_cell*volume) %>% 
+  group_by(id) %>% summarize(total_vol_in_cell = sum(segment_vol_in_cell))
+
+vol_by_grid2$total_vol_in_cell <- as.numeric(vol_by_grid2$total_vol_in_cell) #convert volume col to numeric
+```
+##Map
+```{r}
+ggplot() +
+    geom_sf(data = vol_by_grid2, aes(fill = total_vol_in_cell), color = NA) +
+    geom_sf(data = damCapacity, col = "blue") +
+    scale_fill_gradient2(low = "#132B43", high = "#078FF7") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Volume per ", km^2))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapacity, symbol=10, location="bottomleft") + 
+    scalebar(vol_by_grid2,
+             dist=.5, dist_unit="km", st.size = 3, transform= F) +
+    guides(fill = guide_colorbar(title = expression(paste(m^3)),
+                             title.position = "bottom",
+                             title.theme = element_text(size = 10,
+                                                        colour = "gray70",
+                                                        angle = 0)))
+
+?scale_fill_gradient2
+summary(vol_by_grid2$total_vol_in_cell,na.rm=T)
+```
