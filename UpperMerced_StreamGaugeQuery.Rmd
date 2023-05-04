@@ -12,7 +12,9 @@ library(dataRetrieval)
 library(ggsn)
 library(sf)
 library(maps)
-
+library(devtools)
+#devtools::install_github("markwh/streamstats")
+library(streamstats)
 ```
 #USGS
 #Search for relevant parameters
@@ -306,4 +308,14 @@ duration = "event" # or "E"
 cdec_query(station, sensor, duration, start.date, end.date)
 ```
 
+#Streamstats with R
+```{r}
+?delineateWatershed
+UpperMerced <- delineateWatershed(xlocation = 37.3491, ylocation = -120.9740, crs = 4326,includeparameters = "true", includeflowtypes = "true")
+
+ws1 <- streamstats::delineateWatershed(xlocation = -72.9249, ylocation = 42.3170, crs = 4326,
+includeparameters = "true")
+
+latlon2state(lat,lon)
+```
 
