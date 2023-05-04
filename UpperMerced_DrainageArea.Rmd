@@ -1,0 +1,68 @@
+---
+title: "UpperMerced_DrainageArea"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(dataRetrieval)
+library(ggsn)
+library(sf)
+library(maps)
+
+```
+#Utah Drainage Area Comparison
+##Mcfarlane et al. 2017 use a maximum drainage area of 4600 km2 in the BRAT model for most of Utah (They exclude "region 6" because of water withdrawls, see https://www.beaverinstitute.org/wp-content/uploads/2017/08/UT-BeaverRestorationAssessmentTool.pdf for more details)
+##I found EPA records of drainage area and annual precipitation for Utah and pulled all HUC8 DA and precip values that Macfarlane et al. uses for max da of 4600 km2. (excluding region 6). See data source here https://www.epa.gov/wsio/wsio-indicator-data-library
+##4600 km2 is equal to 4.6e9 m2 or 4600000000 m2
+```{r}
+utah <- read.csv("Utah_da_precip.csv")
+
+#columns are HUC8 code, watershed area in m3 (stand in for drainage area), and annual precipitation from 1981-2010 in inches/year
+utah
+
+#convert precip to cm
+utah$precip_cm <- utah$precip_in*2.54
+
+precip <- utah$precip_cm
+da <- utah$area_m3
+
+lm_fit <- lm(da ~ precip)
+plot(da ~ precip)
+plot(lm_fit)
+#bad fit
+
+lm_fit <- lm(log(da) ~ log(precip))
+plot(log(da) ~ log(precip))
+plot(lm_fit)
+#better with log transform
+
+predict(lm_fit)
+new_obs <- data.frame(da = 460000000)
+precip_max <- predict(lm_fit, newdata = new_obs)
+exp(precip_max)
+#hmm...seems high
+
+
+
+```
+
+```{r}
+mean(utah$precip_cm)
+summary(utah$area_m3)
+summary(utah$precip_cm)
+#so for 23 cm/year to 78 cm/year, using 4600 km2
+
+#mean da = 4430 km2
+#mean precip = 44.33 cm/year
+```
+
+#Upper Merced
+##Mean annual precip in the Upper Merced is 36.859 in/year, or 93.62186 cm/year
+##Drainage area in the Upper Merced is 3287865600 m2
+```{r}
+36.859*2.54
+```
+

@@ -1,0 +1,81 @@
+HUC8Dir,DA_Threshold,Notes
+AntelopeFremontValleys_18090206,3500,No part of watershed stream size limited
+Applegate_17100309,2000,No part of watershed stream size limited
+BattleCreek_18020153,1000,No part of watershed stream size limited
+BigChicoCreekSacramentoRiver_18020157,2500,Only Sacramento River limiting
+BigNavarroGarcia_18010108,810,Close to shoreline limiting; overestimate of drainage area due to multiple outlets in watershed
+Butte_18010205,1600,No part of watershed stream size limited
+ButteCreek_18020158,2500,No part of watershed stream size limited
+ClearCreekSacramentoRiver_18020154,645,Sacramento River and outlet of Clear Creek limited
+CottonwoodCreek_18020152,3000,No part of watershed stream size limited
+CowCreek_18020151,1106,Outlet of Cow Creek
+CrowleyLake_18090102,4500,No part of watershed stream size limited
+EastBranchNorthForkFeather_18020122,1912,Most of main channel
+EastWalker_16050301,3500,No part of watershed stream size limited
+FresnoRiver_18040007,1000,No part of watershed stream size limited
+GooseLake_18020001,2000,No part of watershed stream size limited
+HoncutHeadwatersLowerFeather_18020159,551.5,Outlet of Honcut Creek and Feather River limited
+HoneyEagleLakes_18080003,5000,No part of watershed stream size limited
+Illinois_17100311,2203,Lower reach of main channel
+IndianWellsSearlesValleys_18090205,5400,No part of watershed stream size limited
+LakeTahoe_16050101,1500,No part of watershed stream size limited
+Lost_18010204,6660,Klamath River above dam limited
+LowerEel_18010105,1830,Only limited on main Eel River
+LowerKlamath_18010209,27000,Only limited on main Klamath River
+LowerPit_18020003,12501,Lower section of Pit River
+MadelinePlains_18080002,957,Lower section of main channel
+MadRedwood_18010102,1500,No part of watershed stream size limited
+MassacreLake_16040204,1500,No part of watershed stream size limited
+McCloud_18020004,1591,Lower section of McCloud River
+MiddleForkEel_18010104,430,Most of main channel
+MiddleForkFeather_18020123,2140,Most of main channel
+MiddleKernUpperTehachapiGrapevine_18030003,5979,Most of Kern River
+MiddleSanJoaquinLowerChowchilla_18040001,5000,Overestimate because of overlap between build-able streams and non-buildable streams
+MonoLake_18090101,3000,No part of watershed stream size limited
+NorthForkAmerican_18020128,2497,Lower reach of North Fork American River
+NorthForkFeather_18020121,1541.9,Main channel of North Fork Feather
+OwensLake_18090103,5500,No part of watershed stream size limited
+PaynesCreekSacramentoRiver_18020155,3000,Sacramento River limited
+Russian_18010110,2667,Lower reaches of Russian River
+SacramentoHeadwaters_18020005,925,Lower reaches of Sacramento River
+Salmon_18010210,1904,Lower reaches of Salmon
+SanPabloBay_18050002,689,Overestimate - Petaluma River
+Scott_18010208,2500,No part of watershed stream size limited
+Shasta_18010207,2500,No part of watershed stream size limited
+Smith_18010101,805,Lower reaches of Smith River limited
+SmokeCreekDesert_16040203,6000,No part of watershed stream size limited
+SouthForkAmerican_18020129,1153,South Fork American River
+SouthForkEel_18010106,454,Most of Sout Fork Eel River
+SouthForkKern_18030002,2418,around lake
+SouthForkTrinity_18010212,1842,main channel of South Fork Trinity
+SurpriseValley_18080001,2800,No part of watershed stream size limited
+ThomesCreekSacramentoRiver_18020156,446,Sacramento River and thomes Creek
+TomalesDrakeBays_18050005,266,Only outlet of Lagunitas Creek
+Trinity_18010211,3640,Lower reaches of Trinity River
+Truckee_16050102,5000,No part of watershed stream size limited
+TulareLakeBed_18030012,900,Kings River and major canals
+UpperBear_18020126,1068,Only outlet of Bear River
+UpperCache_18020116,3500,No part of watershed stream size limited
+UpperCalaverasCalifornia_18040011,5000,No part of watershed stream size limited
+UpperCarson_16050201,3000,No part of watershed stream size limited
+UpperCoonUpperAuburn_18020161,1000,Sacramento River only
+UpperCosumnes_18040013,2424.5,Outlet of Cosumnes River
+UpperDeerUpperWhite_18030005,2000,No part of watershed stream size limited
+UpperDry_18030009,4000,end of canals
+UpperEel_18010103,1163,Most of Eel River
+UpperKaweah_18030007,1650,Kaweah River below reservoir
+UpperKern_18030001,2658,Canals meet reservoir/lake
+UpperKing_18030010,2055,King River main channel
+UpperKlamath_18010206,18000,Klamath River
+UpperMerced_18040008,2324,Most of Merced River
+UpperMokelumne_18040012,2500,Lower reaches of Molekumne River
+UpperPit_18020002,6343,Lower reaches of Pit River
+UpperPoso_18030004,790,Lower Poso Creek
+UpperSanJoaquin_18040006,2076,Most of San Joaquin River
+UpperStanislaus_18040010,700,Stanislaus River and North Fork Stanislaus River
+UpperStony_18020115,740,Most of main channel
+UpperTule_18030006,2500,No part of watershed stream size limited
+UpperTuolumne_18040009,1882,Tuolomne River
+UpperYuba_18020125,553,"Yuba River, South  Yuba River and North Yuba River"
+WarnerLakes_17120007,5500,No part of watershed stream size limited
+WestWalker_16050302,3000,No part of watershed stream size limited
