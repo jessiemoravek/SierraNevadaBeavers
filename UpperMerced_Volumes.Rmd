@@ -97,14 +97,15 @@ damCapClip$iGeo_Slope
 ```{r}
 damCapClip_v <- damCapClip
 for (i in damCapClip_v){
+  damDens <- damCapClip_v$mCC_EX_CT
   slope <- damCapClip_v$iGeo_Slope #meters
   da <- damCapClip_v$iGeo_DA #m2
   width <- ifelse(da < 4.95,2.18*(da)^0.191,
                   ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183))
   length <- 1/slope
   maxLength<- (damCapClip_v$iGeo_Len/damCapClip_v$mCC_EX_CT)
-  volume <- ifelse(length < maxLength, 0.5*1*(width)*(length),1*(width)*(maxLength))
-  surfaceArea <- ifelse(length < maxLength, (width)*(length),(width)*(maxLength))
+  volume <- ifelse(length < maxLength, 0.5*1*(width)*(length)*(damDens),1*(width)*(maxLength)*(damDens))
+  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damDens),(width)*(maxLength)*(damDens))
   damCapClip_v$width <- width
   damCapClip_v$volume <- volume #m3
   damCapClip_v$surfaceArea <- surfaceArea #m2
@@ -171,7 +172,8 @@ ggplot() +
                                                         colour = "gray70",
                                                         angle = 0)))
 
-median(vol_by_grid$total_vol_in_cell,na.rm=T)
+summary(vol_by_grid$total_vol_in_cell,na.rm=T)
+summary(damCapClip$mCC_EX_CT)
 ```
 
 ##Surface Area by grid cell
@@ -282,14 +284,15 @@ ggplot() +
 ```{r}
 damCapacity_v <- damCapacity
 for (i in damCapacity_v){
+  damDens <- damCapacity_v$mCC_EX_CT
   slope <- damCapacity_v$iGeo_Slope #meters
   da <- damCapacity_v$iGeo_DA #m2
   width <- ifelse(da < 4.95,2.18*(da)^0.191,
                   ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183))
   length <- 1/slope
   maxLength<- (damCapacity_v$iGeo_Len/damCapacity_v$mCC_EX_CT)
-  volume <- ifelse(length < maxLength, 0.5*1*(width)*(length),1*(width)*(maxLength))
-  surfaceArea <- ifelse(length < maxLength, (width)*(length),(width)*(maxLength))
+    volume <- ifelse(length < maxLength, 0.5*1*(width)*(length)*(damDens),1*(width)*(maxLength)*(damDens))
+  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damDens),(width)*(maxLength)*(damDens))
   damCapacity_v$width <- width
   damCapacity_v$volume <- volume #m3
   damCapacity_v$surfaceArea <- surfaceArea #m2
@@ -313,13 +316,14 @@ vol_by_grid2 <- grid2 %>%
   group_by(id) %>% summarize(total_vol_in_cell = sum(segment_vol_in_cell))
 
 vol_by_grid2$total_vol_in_cell <- as.numeric(vol_by_grid2$total_vol_in_cell) #convert volume col to numeric
+saveRDS(vol_by_grid2,"vol_by_grid2.rds")
 ```
 ###Map
 ```{r}
 ggplot() +
     geom_sf(data = vol_by_grid2, aes(fill = total_vol_in_cell), color = NA) +
     geom_sf(data = damCapacity, col = "blue") +
-    scale_fill_gradient2(limits = c(0,150), low = "#132B43", high = "#078FF7") +
+    scale_fill_gradient2(limits = c(0.01,76810.52),low = "#132B43", high = "#078FF7") +
     xlab(NULL)+
     ylab(NULL)+
     ggtitle( expression(paste("Volume per ", km^2))) + 
@@ -349,13 +353,15 @@ sa_by_grid2 <- grid2 %>%
   group_by(id) %>% summarize(total_sa_in_cell = sum(segment_sa_in_cell))
 
 sa_by_grid2$total_sa_in_cell <- as.numeric(sa_by_grid2$total_sa_in_cell) #convert volume col to numeric
+
+saveRDS(sa_by_grid2,"sa_by_grid2")
 ```
 ###Map
 ```{r}
 ggplot() +
     geom_sf(data = sa_by_grid2, aes(fill = total_sa_in_cell), color = NA) +
     #geom_sf(data = damCapacity, col = "blue") +
-    scale_fill_gradient2(limits = c(0,150), low = "#43132B", high = "#F7078F") +
+    scale_fill_gradient2(limits = c(0,10000), low = "#43132B", high = "#F7078F") +
     xlab(NULL)+
     ylab(NULL)+
     ggtitle( expression(paste("Surface Area per ", km^2))) + 
@@ -375,3 +381,36 @@ ggplot() +
 ?scale_fill_gradient2
 summary(sa_by_grid2$total_sa_in_cell,na.rm=T)
 ```
+
+#Investigate outliers
+```{r}
+vol_by_grid2
+sa_by_grid2
+
+hist(vol_by_grid2$total_vol_in_cell)
+summary(vol_by_grid2$total_vol_in_cell)
+
+vol_by_grid2 %>% arrange(desc(total_vol_in_cell))
+```
+```{r}
+ggplot() +
+    geom_sf(data = vol_by_grid2, aes(fill = total_vol_in_cell), color = NA) +
+    geom_sf(data = damCapacity, col = "blue") +
+    scale_fill_gradient2(limits = c(10000,52628.57442), low = "#43132B", high = "#F7078F") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Volume per ", km^2))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapacity, symbol=10, location="bottomleft") + 
+    scalebar(vol_by_grid2,
+             dist=20, dist_unit="km", st.size = 3, transform= F) +
+    guides(fill = guide_colorbar(title = expression(paste(m^3)),
+                             title.position = "bottom",
+                             title.theme = element_text(size = 10,
+                                                        colour = "gray70",
+                                                        angle = 0)))
+```
+
