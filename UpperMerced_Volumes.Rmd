@@ -318,7 +318,7 @@ vol_by_grid2$total_vol_in_cell <- as.numeric(vol_by_grid2$total_vol_in_cell) #co
 ```{r}
 ggplot() +
     geom_sf(data = vol_by_grid2, aes(fill = total_vol_in_cell), color = NA) +
-    #geom_sf(data = damCapacity, col = "blue") +
+    geom_sf(data = damCapacity, col = "blue") +
     scale_fill_gradient2(limits = c(0,150), low = "#132B43", high = "#078FF7") +
     xlab(NULL)+
     ylab(NULL)+
