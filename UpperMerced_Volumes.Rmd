@@ -262,7 +262,7 @@ grid2 <- st_make_grid(boundingBox, square = T, cellsize = c(grid_spacing, grid_s
 grid2 <- mutate(grid2, id = 1:nrow(grid2))
 ```
 
-##Map
+###Map
 ```{r}
 ggplot() +
     geom_sf(data = grid2, fill = NA) +
@@ -314,11 +314,11 @@ vol_by_grid2 <- grid2 %>%
 
 vol_by_grid2$total_vol_in_cell <- as.numeric(vol_by_grid2$total_vol_in_cell) #convert volume col to numeric
 ```
-##Map
+###Map
 ```{r}
 ggplot() +
     geom_sf(data = vol_by_grid2, aes(fill = total_vol_in_cell), color = NA) +
-    geom_sf(data = damCapacity, col = "blue") +
+    #geom_sf(data = damCapacity, col = "blue") +
     scale_fill_gradient2(limits = c(0,150), low = "#132B43", high = "#078FF7") +
     xlab(NULL)+
     ylab(NULL)+
@@ -338,4 +338,40 @@ ggplot() +
 0:150
 ?scale_fill_gradient2
 summary(vol_by_grid2$total_vol_in_cell,na.rm=T)
+```
+##Surface Area by grid cell
+```{r}
+#use grid2 (after doing the leftjoin above for volume calculations)
+
+sa_by_grid2 <- grid2 %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_sa_in_cell = percent_len_in_cell*surfaceArea) %>% 
+  group_by(id) %>% summarize(total_sa_in_cell = sum(segment_sa_in_cell))
+
+sa_by_grid2$total_sa_in_cell <- as.numeric(sa_by_grid2$total_sa_in_cell) #convert volume col to numeric
+```
+###Map
+```{r}
+ggplot() +
+    geom_sf(data = sa_by_grid2, aes(fill = total_sa_in_cell), color = NA) +
+    #geom_sf(data = damCapacity, col = "blue") +
+    scale_fill_gradient2(limits = c(0,150), low = "#43132B", high = "#F7078F") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Surface Area per ", km^2))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapacity, symbol=10, location="bottomleft") + 
+    scalebar(vol_by_grid2,
+             dist=20, dist_unit="km", st.size = 3, transform= F) +
+    guides(fill = guide_colorbar(title = expression(paste(m^2)),
+                             title.position = "bottom",
+                             title.theme = element_text(size = 10,
+                                                        colour = "gray70",
+                                                        angle = 0)))
+0:150
+?scale_fill_gradient2
+summary(sa_by_grid2$total_sa_in_cell,na.rm=T)
 ```
