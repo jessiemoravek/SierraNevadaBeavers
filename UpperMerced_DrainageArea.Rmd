@@ -65,4 +65,5 @@ summary(utah$precip_cm)
 ```{r}
 36.859*2.54
 ```
-
+#Final conclusion
+##I found a list of max DAs used for each watershed in the TNC run of BRAT in 2018. See here https://usu.app.box.com/s/7w5mawvoaycnzm7po5knjiv20fwckp8q
