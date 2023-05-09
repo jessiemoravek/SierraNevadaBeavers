@@ -465,6 +465,7 @@ grid3 <- st_make_grid(boundingBox2, square = T, cellsize = c(grid_spacing, grid_
 
 #add an id column
 grid3 <- mutate(grid3, id = 1:nrow(grid3))
+dim(grid3)
 ```
 
 ###Map
@@ -522,13 +523,15 @@ vol_by_grid3 <- grid3 %>%
 
 vol_by_grid3$total_vol_in_cell <- as.numeric(vol_by_grid3$total_vol_in_cell) #convert volume col to numeric
 saveRDS(vol_by_grid3,"vol_by_grid3.rds")
+vol_by_grid3 <- readRDS("vol_by_grid3.rds")
 sum(vol_by_grid3$total_vol_in_cell, na.rm=T)
+
 ```
 ###Map
 ```{r}
 ggplot() +
     geom_sf(data = vol_by_grid3, aes(fill = total_vol_in_cell), color = NA) +
-    geom_sf(data = damCapacity2, col = "blue") +
+    #geom_sf(data = damCapacity2, col = "blue") +
     scale_fill_gradient2(low = "gray70", high = "#078FF7") +
     xlab(NULL)+
     ylab(NULL)+
@@ -549,6 +552,11 @@ ggplot() +
 ?scale_fill_gradient2
 summary(vol_by_grid3$total_vol_in_cell,na.rm=T)
 ```
+
+
+
+
+
 
 ##Surface Area by grid cell
 ```{r}
