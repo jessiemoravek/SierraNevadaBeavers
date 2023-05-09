@@ -96,16 +96,17 @@ damCapClip$iGeo_Slope
 #Volume and Surface Area calculation
 ```{r}
 damCapClip_v <- damCapClip
-for (i in damCapClip_v){
-  damDens <- damCapClip_v$mCC_EX_CT
+for (i in damCapClip_v){ #for each stream segment in the BRAT model output shapefile
+  damCt <- damCapClip_v$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_EX_CT in the attribute table)
   slope <- damCapClip_v$iGeo_Slope #meters
   da <- damCapClip_v$iGeo_DA #m2
   width <- ifelse(da < 4.95,2.18*(da)^0.191,
-                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183))
-  length <- 1/slope
-  maxLength<- (damCapClip_v$iGeo_Len/damCapClip_v$mCC_EX_CT)
-  volume <- ifelse(length < maxLength, 0.5*1*(width)*(length)*(damDens),1*(width)*(maxLength)*(damDens))
-  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damDens),(width)*(maxLength)*(damDens))
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
+  height <- 1 #assume all beaver dams are 1m tall
+  length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
+  maxLength<- (damCapClip_v$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
+  volume <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt))
+  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damCt),(width)*(maxLength)*(damCt))
   damCapClip_v$width <- width
   damCapClip_v$volume <- volume #m3
   damCapClip_v$surfaceArea <- surfaceArea #m2
@@ -148,7 +149,7 @@ vol_by_grid <- grid1 %>%
   mutate(segment_vol_in_cell = percent_len_in_cell*volume) %>% 
   group_by(id) %>% summarize(total_vol_in_cell = sum(segment_vol_in_cell))
 
-vol_by_grid
+
 vol_by_grid$total_vol_in_cell <- as.numeric(vol_by_grid$total_vol_in_cell) #convert volume col to numeric
 ```
 ```{r}
@@ -217,33 +218,33 @@ median(vol_by_grid$total_vol_in_cell,na.rm=T)
 ##Bounding Box
 ```{r}
 #This box aligns with this LIS model coordinates
-getwd()
+#getwd()
 
 # Read in the shapefile with st_read()
-boundingBox <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/BoundingBox.shp")
+#boundingBox <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/BoundingBox.shp")
 
 #remove unneeded shapefiles
-file.remove(list.files(pattern = "BoundingBox*",recursive = F))
+#file.remove(list.files(pattern = "BoundingBox*",recursive = F))
 
 #Project to California Teal Albers (NAD83) EPSG code 3310
-boundingBox <- st_transform(boundingBox, 3310)
+#boundingBox <- st_transform(boundingBox, 3310)
 
-saveRDS(boundingBox,"boundingBox")
+#saveRDS(boundingBox,"boundingBox")
 boundingBox <- readRDS("boundingBox")
 ```
 ##Dam Capacity
 ```{r}
 #This box aligns with this LIS model coordinates
-getwd()
+#getwd()
 
 # Read in the shapefile with st_read()
-damCapacity <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity.shp")
+#damCapacity <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity.shp")
 
 #remove unneeded shapefiles
-file.remove(list.files(pattern = "damCapacity*",recursive = F))
+#file.remove(list.files(pattern = "damCapacity*",recursive = F))
 
 #Project to California Teal Albers (NAD83) EPSG code 3310
-damCapacity <- st_transform(damCapacity, 3310)
+#damCapacity <- st_transform(damCapacity, 3310)
 
 saveRDS(damCapacity,"damCapacity")
 damCapacity <- readRDS("damCapacity")
@@ -283,13 +284,13 @@ ggplot() +
 ##Volume and Surface Area calculation
 ```{r}
 damCapacity_v <- damCapacity
-for (i in damCapacity_v){
-  damDens <- damCapacity_v$mCC_EX_CT
+for (i in damCapacity_v){ #for each stream segment in the BRAT model output shapefile
+  damDens <- damCapacity_v$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_EX_CT in the attribute table)
   slope <- damCapacity_v$iGeo_Slope #meters
   da <- damCapacity_v$iGeo_DA #m2
   width <- ifelse(da < 4.95,2.18*(da)^0.191,
-                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183))
-  length <- 1/slope
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
+  length <- 1/slope 
   maxLength<- (damCapacity_v$iGeo_Len/damCapacity_v$mCC_EX_CT)
     volume <- ifelse(length < maxLength, 0.5*1*(width)*(length)*(damDens),1*(width)*(maxLength)*(damDens))
   surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damDens),(width)*(maxLength)*(damDens))
@@ -418,35 +419,35 @@ ggplot() +
 ##Bounding Box
 ```{r}
 #This box aligns with this LIS model coordinates
-getwd()
+#getwd()
 
 # Read in the shapefile with st_read()
-boundingBox2 <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/BoundingBox2.shp")
+#boundingBox2 <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/BoundingBox2.shp")
 
 #remove unneeded shapefiles
-file.remove(list.files(pattern = "BoundingBox*",recursive = F))
+#file.remove(list.files(pattern = "BoundingBox*",recursive = F))
 
 #Project to California Teal Albers (NAD83) EPSG code 3310
-boundingBox2 <- st_transform(boundingBox2, 3310)
+#boundingBox2 <- st_transform(boundingBox2, 3310)
 
-saveRDS(boundingBox2,"boundingBox2")
+#saveRDS(boundingBox2,"boundingBox2")
 boundingBox2 <- readRDS("boundingBox2")
 ```
 ##Dam Capacity
 ```{r}
 #This box aligns with this LIS model coordinates
-getwd()
+#getwd()
 
 # Read in the shapefile with st_read()
-damCapacity2 <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity2.shp")
+#damCapacity2 <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity2.shp")
 
 #remove unneeded shapefiles
-file.remove(list.files(pattern = "damCapacity2*",recursive = F))
+#file.remove(list.files(pattern = "damCapacity2*",recursive = F))
 
 #Project to California Teal Albers (NAD83) EPSG code 3310
-damCapacity2 <- st_transform(damCapacity2, 3310)
+#damCapacity2 <- st_transform(damCapacity2, 3310)
 
-saveRDS(damCapacity2,"damCapacity2")
+#saveRDS(damCapacity2,"damCapacity2")
 damCapacity2 <- readRDS("damCapacity2")
 ```
 
@@ -486,16 +487,17 @@ ggplot() +
 ##Volume and Surface Area calculation
 ```{r}
 damCapacity2_v <- damCapacity2
-for (i in damCapacity2_v){
-  damDens <- damCapacity2_v$mCC_EX_CT
+for (i in damCapacity2_v){ #for each stream segment in the BRAT model output shapefile
+  damCt <- damCapacity2_v$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_EX_CT in the attribute table)
   slope <- damCapacity2_v$iGeo_Slope #meters
   da <- damCapacity2_v$iGeo_DA #m2
   width <- ifelse(da < 4.95,2.18*(da)^0.191,
-                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183))
-  length <- 1/slope
-  maxLength<- (damCapacity2_v$iGeo_Len/damCapacity2_v$mCC_EX_CT)
-    volume <- ifelse(length < maxLength, 0.5*1*(width)*(length)*(damDens),1*(width)*(maxLength)*(damDens))
-  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damDens),(width)*(maxLength)*(damDens))
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
+  height <- 1 #assume all beaver dams are 1m tall
+  length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
+  maxLength<- (damCapacity2_v$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
+  volume <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt))
+  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damCt),(width)*(maxLength)*(damCt))
   damCapacity2_v$width <- width
   damCapacity2_v$volume <- volume #m3
   damCapacity2_v$surfaceArea <- surfaceArea #m2
@@ -520,13 +522,14 @@ vol_by_grid3 <- grid3 %>%
 
 vol_by_grid3$total_vol_in_cell <- as.numeric(vol_by_grid3$total_vol_in_cell) #convert volume col to numeric
 saveRDS(vol_by_grid3,"vol_by_grid3.rds")
+sum(vol_by_grid3$total_vol_in_cell, na.rm=T)
 ```
 ###Map
 ```{r}
 ggplot() +
     geom_sf(data = vol_by_grid3, aes(fill = total_vol_in_cell), color = NA) +
-    #geom_sf(data = damCapacity2, col = "blue") +
-    scale_fill_gradient2(low = "#132B43", high = "#078FF7") +
+    geom_sf(data = damCapacity2, col = "blue") +
+    scale_fill_gradient2(low = "gray70", high = "#078FF7") +
     xlab(NULL)+
     ylab(NULL)+
     ggtitle( expression(paste("Volume per ", km^2))) + 
@@ -565,7 +568,7 @@ saveRDS(sa_by_grid3,"sa_by_grid3")
 ggplot() +
     geom_sf(data = sa_by_grid3, aes(fill = total_sa_in_cell), color = NA) +
     #geom_sf(data = damCapacity2, col = "blue") +
-    scale_fill_gradient2(low = "#43132B", high = "#F7078F") +
+    scale_fill_gradient2(low = "gray70", high = "#F7078F") +
     xlab(NULL)+
     ylab(NULL)+
     ggtitle( expression(paste("Surface Area per ", km^2))) + 
