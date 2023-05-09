@@ -5,25 +5,34 @@ date: "2023-05-09"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(dataRetrieval)
+library(ggsn)
+library(sf)
+library(maps)
+library(terra)
+#install.packages('terra', repos='https://rspatial.r-universe.dev')
+
+```
+#Read in data
+```{r}
+vol_by_grid3 <- readRDS('vol_by_grid3.rds')
 ```
 
-## R Markdown
+###Convert to Raster
+```{r}
+r.vol <- rast(vol_by_grid3, xmin = -87159.4, ymin = -76403.81, xmax = 65840.6, ymax = -9403.811,resolution = (c(1000,1000)))
+values(r.vol) <- vol_by_grid3$total_vol_in_cell 
+r.vol  <- terra::flip(r.vol, direction="vertical")
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+plot(r.vol,1)
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+```{r}
+terra::writeRaster(r.vol, 'r.vol.tif', overwrite=TRUE)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
