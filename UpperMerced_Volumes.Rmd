@@ -246,7 +246,7 @@ boundingBox <- readRDS("boundingBox")
 #Project to California Teal Albers (NAD83) EPSG code 3310
 #damCapacity <- st_transform(damCapacity, 3310)
 
-saveRDS(damCapacity,"damCapacity")
+#saveRDS(damCapacity,"damCapacity")
 damCapacity <- readRDS("damCapacity")
 ```
 ##Create 1km grid
@@ -428,7 +428,7 @@ ggplot() +
 #file.remove(list.files(pattern = "BoundingBox*",recursive = F))
 
 #Project to California Teal Albers (NAD83) EPSG code 3310
-#boundingBox2 <- st_transform(boundingBox2, 3310)
+boundingBox2 <- st_transform(boundingBox2, sa_by_grid3, 4326)
 
 #saveRDS(boundingBox2,"boundingBox2")
 boundingBox2 <- readRDS("boundingBox2")
@@ -569,7 +569,9 @@ sa_by_grid3 <- grid3 %>%
 
 sa_by_grid3$total_sa_in_cell <- as.numeric(sa_by_grid3$total_sa_in_cell) #convert volume col to numeric
 
-saveRDS(sa_by_grid3,"sa_by_grid3")
+saveRDS(sa_by_grid3,"sa_by_grid3.rds")
+sa_by_grid3 <- readRDS('sa_by_grid3.rds')
+
 ```
 ###Map
 ```{r}
@@ -596,3 +598,12 @@ ggplot() +
 ?scale_fill_gradient2
 summary(sa_by_grid3$total_sa_in_cell,na.rm=T)
 ```
+#Reproject for rasterization 
+```{r}
+vol_by_grid3_wgs <- st_transform(vol_by_grid3, 4326)
+sa_by_grid3_wgs <- st_transform(sa_by_grid3, 4326)
+
+saveRDS(vol_by_grid3_wgs, "vol_by_grid3_wgs.rds")
+saveRDS(sa_by_grid3_wgs, "sa_by_grid3_wgs.rds")
+```
+

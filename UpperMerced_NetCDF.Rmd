@@ -18,13 +18,13 @@ library(terra)
 ```
 #Read in data
 ```{r}
-vol_by_grid3 <- readRDS('vol_by_grid3.rds')
+vol_by_grid3_wgs <- readRDS('vol_by_grid3_wgs.rds')
 ```
 
 ###Convert to Raster
 ```{r}
-r.vol <- rast(vol_by_grid3, xmin = -87159.4, ymin = -76403.81, xmax = 65840.6, ymax = -9403.811,resolution = (c(1000,1000)))
-values(r.vol) <- vol_by_grid3$total_vol_in_cell 
+r.vol <- rast(vol_by_grid3_wgs, xmin= -120.9929, ymin= 37.32499, xmax= -119.2499, ymax= 37.93177,resolution = (c(1000,1000)))
+values(r.vol) <- vol_by_grid3_wgs$total_vol_in_cell 
 r.vol  <- terra::flip(r.vol, direction="vertical")
 
 plot(r.vol,1)
@@ -35,4 +35,24 @@ plot(r.vol,1)
 terra::writeRaster(r.vol, 'r.vol.tif', overwrite=TRUE)
 
 ```
+#Surface Area
+##Read in Data
+```{r}
+sa_by_grid3 <- readRDS('sa_by_grid3.rds')
 
+```
+
+
+###Convert to Raster
+```{r}
+r.sa <- rast(sa_by_grid3, xmin = -87159.4, ymin = -76403.81, xmax = 65840.6, ymax = -9403.811,resolution = (c(1000,1000)))
+values(r.sa) <- sa_by_grid3$total_sa_in_cell 
+r.sa  <- terra::flip(r.sa, direction="vertical")
+
+plot(r.sa,1)
+
+#project to WSG84 EPSG 4326
+r.sa <- terra::project(r.sa, "4326")
+?project
+
+```
