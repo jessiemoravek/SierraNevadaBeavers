@@ -23,12 +23,17 @@ vol_by_grid3_wgs <- readRDS('vol_by_grid3_wgs.rds')
 
 ###Convert to Raster
 ```{r}
-r.vol <- rast(vol_by_grid3, xmin = -87159.4, ymin = -76403.81, xmax = 65840.6, ymax = -9403.811,resolution = (c(1000,1000)))
+r.vol <- rast(vol_by_grid3, xmin = -87159.4, ymin = -76403.81, xmax = 65400.97, ymax = -9900.421,resolution = (c(1000,1000)))
+values(r.vol) <- vol_by_grid3$total_vol_in_cell 
+r.vol
+#see how many columns and rows we need 
+
+#now do a real one
+r.vol <- rast(ncols = 153, nrows = 67, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
+r.vol
 values(r.vol) <- vol_by_grid3$total_vol_in_cell 
 r.vol  <- terra::flip(r.vol, direction="vertical")
-#project to WSG84 EPSG 4326
-r.vol <- terra::project(r.vol, "EPSG:4326")
-plot(r.vol,1)
+plot(r.vol,1, colNA="grey70")
 ```
 
 
@@ -48,12 +53,14 @@ sa_by_grid3 <- readRDS('sa_by_grid3.rds')
 ```{r}
 r.sa <- rast(sa_by_grid3, xmin = -87159.4, ymin = -76403.81, xmax = 65840.6, ymax = -9403.811,resolution = (c(1000,1000)))
 values(r.sa) <- sa_by_grid3$total_sa_in_cell 
+#see how many columns and rows we need 
+
+#now do a real one
+r.sa <- rast(ncols = 153, nrows = 67, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
+r.vol
+values(r.sa) <- sa_by_grid3$total_sa_in_cell 
 r.sa  <- terra::flip(r.sa, direction="vertical")
-
-plot(r.sa,1)
-
-#project to WSG84 EPSG 4326
-r.sa <- terra::project(r.sa, "EPSG:4326")
+plot(r.sa,1, colNA="grey70")
 
 ```
 

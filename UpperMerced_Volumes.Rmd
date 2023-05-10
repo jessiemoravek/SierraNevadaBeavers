@@ -428,9 +428,9 @@ ggplot() +
 #file.remove(list.files(pattern = "BoundingBox*",recursive = F))
 
 #Project to California Teal Albers (NAD83) EPSG code 3310
-boundingBox2 <- st_transform(boundingBox2, sa_by_grid3, 4326)
+boundingBox2 <- st_transform(boundingBox2, 3310)
 
-#saveRDS(boundingBox2,"boundingBox2")
+saveRDS(boundingBox2,"boundingBox2")
 boundingBox2 <- readRDS("boundingBox2")
 ```
 ##Dam Capacity
@@ -445,9 +445,8 @@ boundingBox2 <- readRDS("boundingBox2")
 #file.remove(list.files(pattern = "damCapacity2*",recursive = F))
 
 #Project to California Teal Albers (NAD83) EPSG code 3310
-#damCapacity2 <- st_transform(damCapacity2, 3310)
-
-#saveRDS(damCapacity2,"damCapacity2")
+damCapacity2 <- st_transform(damCapacity2, 3310)
+saveRDS(damCapacity2,"damCapacity2")
 damCapacity2 <- readRDS("damCapacity2")
 ```
 
