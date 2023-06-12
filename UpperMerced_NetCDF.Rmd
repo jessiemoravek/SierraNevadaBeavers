@@ -71,3 +71,5 @@ plot(r.sa,1, colNA="grey70")
 terra::writeRaster(r.sa, 'r.sa.tif', overwrite=TRUE)
 
 ```
+
+
