@@ -14,6 +14,9 @@ library(sf)
 library(maps)
 library(terra)
 #install.packages('terra', repos='https://rspatial.r-universe.dev')
+library(raster)
+library(ncdf4)
+library(RNetCDF)
 
 ```
 #Read in data
@@ -31,7 +34,7 @@ r.vol
 #now do a real one
 r.vol <- rast(ncols = 153, nrows = 67, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
 r.vol
-values(r.vol) <- vol_by_grid3$total_vol_in_cell 
+values(r.vol) <- vol_by_grid3_wgs$total_vol_in_cell 
 r.vol  <- terra::flip(r.vol, direction="vertical")
 plot(r.vol,1, colNA="grey70")
 ```
@@ -58,7 +61,7 @@ values(r.sa) <- sa_by_grid3$total_sa_in_cell
 #now do a real one
 r.sa <- rast(ncols = 153, nrows = 67, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
 r.vol
-values(r.sa) <- sa_by_grid3$total_sa_in_cell 
+values(r.sa) <- sa_by_grid3_wgs$total_sa_in_cell 
 r.sa  <- terra::flip(r.sa, direction="vertical")
 plot(r.sa,1, colNA="grey70")
 
