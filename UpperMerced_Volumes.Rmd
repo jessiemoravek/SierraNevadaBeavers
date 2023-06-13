@@ -627,7 +627,9 @@ saveRDS(sa_by_grid3_wgs, "sa_by_grid3_wgs.rds")
 #Project to California Teal Albers (NAD83) EPSG code 3310
 boundingBox2 <- readRDS("boundingBox2")
 
-boundingBox2 <- st_transform(boundingBox2, 4326)
+wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
+
+boundingBox2 <- st_transform(boundingBox2, crs = wkt)
 
 saveRDS(boundingBox2,"boundingBox2")
 ```
@@ -645,37 +647,44 @@ saveRDS(boundingBox2,"boundingBox2")
 #Project to California Teal Albers (NAD83) EPSG code 3310
 damCapacity2 <- readRDS("damCapacity2")
 
-damCapacity2 <- st_transform(damCapacity2, 4326)
+damCapacity2 <- st_transform(damCapacity2, wkt)
 saveRDS(damCapacity2,"damCapacity2")
 ```
 
 ##Create 1km grid
 ```{r}
 #convert to projected crs
-boundingBox_tealalbers <- st_transform(boundingBox2, 3310)
+boundingBox_tealalbers <- st_transform(boundingBox2, wkt)
 #Check if sf object is in metric CRS (i.e. projected)
-st_is_longlat(boundingBox_tealalbers)
+st_is_longlat(boundingBox2)
 #st_is_longlat returns "False" which means that the object is in a metric CRS
 
 #CRS 3310 is in units of meters (see here https://epsg.io/3310)
 grid_spacing <- 1000 
 
-grid3 <- st_make_grid(boundingBox_tealalbers, square = T, cellsize = c(grid_spacing, grid_spacing)) %>% # the grid, covering bounding box
+grid3 <- st_make_grid(boundingBox2, square = T, cellsize = c(grid_spacing, grid_spacing)) %>% # the grid, covering bounding box
   st_sf()
 
 #add an id column
 grid3 <- mutate(grid3, id = 1:nrow(grid3))
 dim(grid3)
 
-grid_wgs84 <- st_transform(grid3, 4326)
-dim(grid_wgs84)
+grid3 <- st_transform(grid3, wkt)
+dim(grid3)
+
+
+#using a raster 
+
+gridr <- raster(boundingBox2, nrows = 63, ncols = 174,crs = wkt)            
+dim(gridr)
+?rasterize
 
 ```
 
 ###Map
 ```{r}
 ggplot() +
-    geom_sf(data = grid3, fill = NA) +
+   geom_sf(data = grid3, fill = NA) +
     geom_sf(data = damCapacity2, col = "blue") +
     xlab(NULL)+
     ylab(NULL)+
