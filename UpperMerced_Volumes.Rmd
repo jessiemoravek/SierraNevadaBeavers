@@ -11,7 +11,7 @@ library(dataRetrieval)
 library(ggsn)
 library(sf)
 library(maps)
-library(raster)
+#library(raster)
 library(sp)
 ```
 
@@ -613,6 +613,120 @@ saveRDS(sa_by_grid3_wgs, "sa_by_grid3_wgs.rds")
 
 #Messing with Projections
 ##Note that we weren't using the correct max DA
+#ChatGPT version
+```{r}
+library(sf)
+library(sp)
+library(raster)
+```
+
+```{r}
+xmin <- -120.985
+xmax <- -119.255
+ymin <- 37.325
+ymax <- 37.925
+extent <- extent(xmin, xmax, ymin, ymax)
+
+study_area2 <- st_bbox(extent, crs = st_crs(wkt))
+
+study_area3 = st_bbox(st_transform(st_as_sfc(study_area2), crs = wkt))
+#cellsize = (c(diff(study_area3[c(1, 3)]), diff(study_area3[c(2, 4)])))/n, 
+
+study_area4 = st_make_grid(study_area3,   n = c(174,63))
+
+study_area4 <- st_sf(study_area4)
+
+ggplot() +
+   geom_sf(data = study_area4, fill = NA) +
+    #geom_sf(data = damCapacity2, col = "blue") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Upper Merced 1km Grid"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) 
+    #north(damCapacity2, symbol=10, location="bottomright") + 
+    #scalebar(damCapacity2,
+             #dist=10, dist_unit="km", st.size = 3, transform= F) 
+
+
+#add an id column
+study_area4 <- mutate(study_area4, id = 1:nrow(study_area4))
+str(study_area4)
+```
+
+```{r}
+# Create a polygon object
+study_area <- as(extent, "SpatialPolygons")
+```
+
+```{r}
+wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
+
+
+# Define the projection of the study area
+proj4string(study_area) <- CRS(wkt)
+```
+
+```{r}
+# Create a raster grid with 1 km resolution
+grid_res <- 0.01 # 1 km in meters
+e <- extent(study_)
+grid_raster <- raster::raster(study_area3)
+res(grid_raster) <- 1000
+#not working for some reason
+```
+
+```{r}
+# Calculate the grid resolution in degrees
+grid_res <- 0.01  # 0.01 degrees is approximately 1 km
+
+# Calculate the number of cells in x and y direction
+n_cells_x <- ceiling((xmax - xmin) / grid_res)
+n_cells_y <- ceiling((ymax - ymin) / grid_res)
+
+# Create a regular grid over the study area
+grid <- GridTopology(
+  cellcentre.offset = c(xmin + grid_res / 2, ymin + grid_res / 2),
+  cellsize = c(grid_res, grid_res),
+  cells.dim = c(n_cells_x, n_cells_y)
+)
+```
+
+```{r}
+# Convert the grid to a spatial grid object
+grid_sp <- SpatialGrid(grid, proj4string = CRS(proj4string(study_area)))
+
+```
+
+```{r}
+# Convert the spatial grid to a spatial points object
+grid_points <- as(grid_sp, "SpatialPoints")
+```
+
+
+```{r}
+# Project the points back to the geographic coordinate system
+grid_points_geo <- spTransform(grid_points, CRS(wkt))
+```
+
+```{r}
+#Check 
+n_cells_x <- grid_points_geo@cells.dim[1]
+n_cells_y <- grid_points_geo@cells.dim[2]
+
+plot(grid_points_geo)
+```
+
+
+
+
+
+
+
+
+
 ##Bounding Box
 ```{r}
 #This box aligns with this LIS model coordinates
