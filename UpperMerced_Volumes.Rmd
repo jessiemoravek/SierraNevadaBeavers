@@ -619,9 +619,32 @@ library(sf)
 library(sp)
 library(raster)
 ```
-
 ```{r}
 wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
+```
+
+
+##Dam Capacity
+```{r}
+#This box aligns with this LIS model coordinates
+#getwd()
+
+# Read in the shapefile with st_read()
+#damCapacity2 <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity2.shp")
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "damCapacity2*",recursive = F))
+
+#Project to California Teal Albers (NAD83) EPSG code 3310
+damCapacity2 <- readRDS("damCapacity2")
+
+damCapacity2 <- st_transform(damCapacity2, wkt)
+saveRDS(damCapacity2,"damCapacity2")
+```
+
+###IMPORTANT CODE
+```{r}
+
 
 xmin <- -120.985
 xmax <- -119.255
@@ -640,9 +663,50 @@ study_area5 = st_sf(geom=study_area4)
 class(study_area5)
 
 #add an id column
-study_area5$ID=1:length(study_area4)
+study_area5$id=1:length(study_area4)
 ```
+##Volume and Surface Area calculation
+```{r}
+damCapacity2_v <- damCapacity2
+for (i in damCapacity2_v){ #for each stream segment in the BRAT model output shapefile
+  damCt <- damCapacity2_v$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_EX_CT in the attribute table)
+  slope <- damCapacity2_v$iGeo_Slope #meters
+  da <- damCapacity2_v$iGeo_DA #m2
+  width <- ifelse(da < 4.95,2.18*(da)^0.191,
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
+  height <- 1 #assume all beaver dams are 1m tall
+  length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
+  maxLength<- (damCapacity2_v$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
+  volume <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt))
+  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damCt),(width)*(maxLength)*(damCt))
+  damCapacity2_v$width <- width
+  damCapacity2_v$volume <- volume #m3
+  damCapacity2_v$surfaceArea <- surfaceArea #m2
+} 
 
+
+saveRDS(damCapacity2_v,"damCapacity2_v.rds")
+```
+##Volume by grid cell
+```{r}
+intersection5 <- st_intersection(study_area5, damCapacity2_v) %>% 
+  mutate(length = st_length(.)) %>% #creates a "length" column that is the length of that particular segment in the grid cell from the "id" column
+  st_drop_geometry() # complicates things in joins later on
+
+grid3 <- grid3 %>% 
+  left_join(intersection3, by = "id")
+
+vol_by_grid3 <- grid3 %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_vol_in_cell = percent_len_in_cell*volume) %>% 
+  group_by(id) %>% summarize(total_vol_in_cell = sum(segment_vol_in_cell))
+
+vol_by_grid3$total_vol_in_cell <- as.numeric(vol_by_grid3$total_vol_in_cell) #convert volume col to numeric
+saveRDS(vol_by_grid3,"vol_by_grid3.rds")
+vol_by_grid3 <- readRDS("vol_by_grid3.rds")
+sum(vol_by_grid3$total_vol_in_cell, na.rm=T)
+
+```
 
 ```{r}
 ggplot() +
