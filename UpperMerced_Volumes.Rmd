@@ -738,3 +738,111 @@ vol_by_grid5
 st_write(vol_by_grid5, "vol_by_grid5.nc")
 ```
 
+
+##Writing the code in R instead of Python
+
+```{r}
+library(ncdf4)
+library(terra)
+```
+
+###Practice code
+```{r}
+# Create a small 2x3x4 array
+height_array <- array(cumsum(abs(rnorm(24))), dim = c(5, 5, 10))
+
+# Print the array
+print(height_array)
+height_1 <- height_array[1,1,]
+
+#multiply by arrea
+
+area_matrix <- matrix(cumsum(abs(rnorm(24))), 5, 5)
+
+area_1 <- area_matrix[1,1]
+
+volume_1 <- height_1 * area_1
+plot(height_1, volume_1)
+
+model_1<-lm(volume_1 ~ height_1)
+
+m <- coef(model_1)[2]
+b <- coef(model_1)[1]
+
+damvol <- 3
+
+floodheight <- (damvol - b )/m
+
+for (i in 1:nrow(area_matrix)){
+  for (j in 1:ncol(area_matrix)){
+    area = area_matrix[i,j]
+    height = height_array[i,j,]
+    volume = area * height
+    model = lm(volume ~ height)
+    m = coef(model)[2]
+    b = coef(model)[1]
+    damvol = 2
+    floodheight = (damvol-b)/m
+    print(floodheight)
+ }}   
+    
+
+```
+
+
+###Data we need
+```{r}
+#volumes
+rvol <- vol_by_grid5
+?rast
+#make it a raster
+rvol <- rast(ncols = 174, nrows = 63, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
+rvol
+values(rvol) <- vol_by_grid5$total_vol_in_cell 
+plot(rvol,1, colNA="grey70") #hmm upside down
+rvol  <- flip(rvol, direction="vertical")
+plot(rvol,1, colNA="grey70")
+
+```
+
+
+```{r}
+#lis inputs
+inputs <- nc_open("lis_input.nc")
+print(inputs)
+
+attributes(inputs$var)
+attributes(inputs$dim)
+
+# Get latitude and longitude with the ncvar_get function and store each into their own object:
+lat <- ncvar_get(inputs, "lat")
+nlat <- dim(lat) #to check it matches the metadata: 23
+lon <- ncvar_get(inputs, "lon")
+nlon <- dim(lon) #to check, should be 24
+# Check your lat lon dimensions match the information in the metadata we explored before:
+print(c(nlon, nlat))
+latlon <- ncvar_get(inputs, "lat")
+
+#now pull an array
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+
+```
+
+```{r}
+for (i in 1:nrow(inputs)){
+  for (j in 1:ncol(inputs)){
+    area = area_matrix[i,j]
+    height = height_array[i,j,]
+    volume = area * height
+    model = lm(volume ~ height)
+    m = coef(model)[2]
+    b = coef(model)[1]
+    damvol = 2
+    floodheight = (damvol-b)/m
+    print(floodheight)
+ }}  
+```
+
+
+
+
