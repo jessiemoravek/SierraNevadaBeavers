@@ -624,7 +624,7 @@ saveRDS(sa_by_grid3_wgs, "sa_by_grid3_wgs.rds")
 library(sf)
 library(sp)
 library(raster)
-library(lwgeom) 
+library(lwgeom)
 ```
 ##NASA projection
 ```{r}
@@ -693,6 +693,7 @@ for (i in damCapacity2_v){ #for each stream segment in the BRAT model output sha
 
 saveRDS(damCapacity2_v,"damCapacity2_v.rds")
 ```
+
 ##Volume by grid cell
 ```{r}
 sf_use_s2(FALSE)
@@ -709,9 +710,9 @@ vol_by_grid5 <- study_area5 %>%
   group_by(id) %>% summarize(total_vol_in_cell = sum(segment_vol_in_cell))
 
 vol_by_grid5$total_vol_in_cell <- as.numeric(vol_by_grid5$total_vol_in_cell) #convert volume col to numeric
+
 saveRDS(vol_by_grid5,"vol_by_grid5.rds")
 vol_by_grid5 <- readRDS("vol_by_grid5.rds")
-sum(vol_by_grid5$total_vol_in_cell, na.rm=T)
 
 ```
 
@@ -727,6 +728,10 @@ ggplot() +
     ggtitle( expression(paste("Volume per ", km^2))) + 
     theme_minimal() 
 ```
+```{r}
+vol_by_grid5
+```
+
 
 ##make NetCDF file
 ```{r}
