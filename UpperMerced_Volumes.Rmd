@@ -734,15 +734,15 @@ vol_by_grid5
 ```
 
 
-#make NetCDF file
+##make NetCDF file
 ```{r}
 #only need to run this once
 #st_write(vol_by_grid5, "vol_by_grid5.nc")
 ```
 
 
-##Writing the code in R instead of Python
-###Practice code
+#Writing the code in R instead of Python
+##Practice code
 ```{r}
 # Create a small 2x3x4 array
 height_array <- array(cumsum(abs(rnorm(24))), dim = c(5, 5, 10))
@@ -786,7 +786,8 @@ for (i in 1:nrow(area_matrix)){
 ```
 
 
-###Data we need
+##Import data
+###Dam volumes
 ```{r}
 #volumes
 rvol <- vol_by_grid5
@@ -801,7 +802,7 @@ plot(rvol,1, colNA="grey70")
 
 ```
 
-
+###Lis inputs 
 ```{r}
 #lis inputs
 inputs <- nc_open("lis_input.nc")
@@ -812,7 +813,7 @@ attributes(inputs$dim)
 
 ```
 
-
+##Organize Inputs data 
 ```{r}
 # Get latitude and longitude with the ncvar_get function and store each into their own object:
 lat <- ncvar_get(inputs, "lat")
@@ -843,7 +844,7 @@ dim(HYMAP_river_width)
 ```
 
 
-
+##Practice slicing
 ```{r}
 #slicing floodplain height
 HYMAP_floodplain_height_slice <- HYMAP_floodplain_height[,,2] 
@@ -870,6 +871,30 @@ dim(river_width)
 # and why not, draw it out:
 image(lon, lat, river_width)
 ```
+##Checking if linear models make sense
+```{r}
+HYMAP_floodplain_height_slice <- HYMAP_floodplain_height[37,46,] 
+HYMAP_grid_area_slice <- HYMAP_grid_area[37,46] 
+vol_slice <- HYMAP_floodplain_height_slice * HYMAP_grid_area_slice
+model_slice <- lm(vol_slice ~ HYMAP_floodplain_height_slice)
+plot(vol_slice~HYMAP_floodplain_height_slice)
+
+```
+```{r}
+HYMAP_floodplain_height_slice <- HYMAP_floodplain_height[138,58,] 
+HYMAP_grid_area_slice <- HYMAP_grid_area[138,58] 
+vol_slice <- HYMAP_floodplain_height_slice * HYMAP_grid_area_slice
+model_slice <- lm(vol_slice ~ HYMAP_floodplain_height_slice)
+plot(vol_slice~HYMAP_floodplain_height_slice)
+```
+
+```{r}
+HYMAP_floodplain_height_slice <- HYMAP_floodplain_height[102,2,] 
+HYMAP_grid_area_slice <- HYMAP_grid_area[102,2] 
+vol_slice <- HYMAP_floodplain_height_slice * HYMAP_grid_area_slice
+model_slice <- lm(vol_slice ~ HYMAP_floodplain_height_slice)
+plot(vol_slice~HYMAP_floodplain_height_slice)
+```
 
 ```{r}
 HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
@@ -892,11 +917,13 @@ for (i in 1:lon){
     b = coef(model)[1]
     floodheight = (floodvol-b)/m
     values(floodheight)[values(floodheight) < 0] = 0
+    totaldamheights = floodheight + HYMAP_river_height[i,j]
     #print(floodheight)
 } 
 
 
 plot(floodheight,1, colNA="grey70")
+plot(totaldamheights,1, colNA="grey70")
 
 
 ```
@@ -905,7 +932,7 @@ plot(floodheight,1, colNA="grey70")
 ```{r}
 #only need to run this once
 ?writeCDF
-writeCDF(floodheight,"floodheight.nc",overwrite=TRUE)
+writeCDF(floodheight,"beaverdamheights.nc",overwrite=TRUE)
   
 ```
 
