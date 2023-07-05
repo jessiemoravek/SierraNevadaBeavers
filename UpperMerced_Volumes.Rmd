@@ -910,6 +910,13 @@ for (i in 1:lon){
   for (j in 1:lat)
     damvol = damvol
     rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j]
+    floodvol = damvol[i,j] - rivervol
+}
+
+for (i in 1:lon){
+  for (j in 1:lat)
+    damvol = damvol
+    rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j]
     floodvol = damvol - rivervol
     area = HYMAP_grid_area[i,j]
     height = HYMAP_floodplain_height[i,j,]
@@ -936,7 +943,7 @@ plot(totaldamheights,1, colNA="grey70")
 ?writeCDF
 writeCDF(floodheight,"beaverdamheights.nc",overwrite=TRUE)
 writeCDF(totaldamheights,"totaldamheights.nc",overwrite=TRUE)
-
+image(lat,lon,lyr.1)
   
 ```
 
