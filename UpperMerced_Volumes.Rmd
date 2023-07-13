@@ -555,6 +555,7 @@ ggplot() +
 
 ?scale_fill_gradient2
 summary(vol_by_grid3$total_vol_in_cell,na.rm=T)
+sum(vol_by_grid3$total_vol_in_cell,na.rm=T)
 ```
 
 
