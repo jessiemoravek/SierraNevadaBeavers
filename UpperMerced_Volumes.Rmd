@@ -13,7 +13,6 @@ library(sf)
 library(maps)
 library(sp)
 library(ncdf4)
-library(terra)
 ```
 
 #Maps
@@ -738,7 +737,7 @@ vol_by_grid5
 ##make NetCDF file
 ```{r}
 #only need to run this once
-#st_write(vol_by_grid5, "vol_by_grid5.nc")
+st_write(vol_by_grid5, "vol_by_grid5.nc")
 ```
 
 
@@ -790,6 +789,8 @@ for (i in 1:nrow(area_matrix)){
 ##Import data
 ###Dam volumes
 ```{r}
+library(terra)
+
 vol_by_grid5 <- readRDS("vol_by_grid5.rds")
 
 #volumes
@@ -802,7 +803,35 @@ values(rvol) <- vol_by_grid5$total_vol_in_cell
 plot(rvol,1, colNA="grey70") #hmm upside down
 rvol  <- flip(rvol, direction="vertical")
 plot(rvol,1, colNA="grey70")
+```
+##Make rvol a netcdf file called total_vol_in_cell
 
+```{r}
+library(RNetCDF)
+
+writeCDF(rvol,"rvol3.nc", overwrite=TRUE)
+
+rvolnc <- nc_open("rvol3.nc")
+print(rvolnc)
+
+# Get latitude and longitude with the ncvar_get function and store each into their own object:
+  lat <- ncvar_get(rvolnc, "latitude")
+  nlat <- dim(lat) #to check it matches the metadata: 63
+  lon <- ncvar_get(rvolnc, "longitude")
+  nlon <- dim(lon) #to check, should be 174
+  # Check your lat lon dimensions match the information in the metadata we explored before:
+  print(c(nlon, nlat))
+
+attributes(rvolnc$var)
+attributes(rvolnc$dim)
+
+#now pull an array
+total_vol_in_cell <- ncvar_get(rvolnc, "rvol3")
+dim(total_vol_in_cell) #to check; this should give you 174 and 63
+
+
+ncvar_add( inputs, rvolnc, verbose=FALSE, indefine=FALSE )
+ncvar_def(rvolnc)
 ```
 
 ###Lis inputs 
@@ -873,6 +902,8 @@ river_width <- HYMAP_river_width[,]
 dim(river_width)
 # and why not, draw it out:
 image(lon, lat, river_width)
+
+
 ```
 ##Checking if linear models make sense
 ```{r}
@@ -898,7 +929,118 @@ vol_slice <- HYMAP_floodplain_height_slice * HYMAP_grid_area_slice
 model_slice <- lm(vol_slice ~ HYMAP_floodplain_height_slice)
 plot(vol_slice~HYMAP_floodplain_height_slice)
 ```
+```{r}
+ncvar_add(inputs, rvol2, verbose=TRUE)
+?ncvar_def()
 
+
+attributes(rvolnc$var)
+attributes(rvolnc$dim)
+
+#now pull an array
+total_vol_in_cell <- ncvar_get(rvolnc, "rvol2")
+dim(total_vol_in_cell) #to check; this should give you 174 and 63
+
+
+#Checking rvol2
+rvol2 <- ncvar_get(rvolnc, "rvol2")
+total_vol_in_cell <- rvol2[,] 
+dim(rvol2)
+# and why not, draw it out:
+image(longitude, latitude, total_vol_in_cell)
+rvol
+```
+
+```{r}
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
+HYMAP_river_width <- ncvar_get(inputs, "HYMAP_river_width")
+HYMAP_river_length <- ncvar_get(inputs, "HYMAP_river_length")
+HYMAP_river_height <- ncvar_get(inputs, "HYMAP_river_height")
+total_vol_in_cell <- ncvar_get(rvolnc, "rvol3")
+damvol <- total_vol_in_cell
+
+lat <- lat[1,]
+lon <- lon[,1]
+
+dim(damvol)
+dim(HYMAP_river_width)
+dim(HYMAP_grid_area)
+lat[1,]
+
+for (i in 1:length(lon)){
+  for (j in 1:length(lat)){
+    damvol = damvol
+    #HYMAP_river_width_test = HYMAP_river_width[,]
+    rivervol = HYMAP_river_width[,] * HYMAP_river_length[,] * HYMAP_river_height[,]
+    floodvol = damvol - rivervol
+    area = HYMAP_grid_area[,]
+    height = HYMAP_floodplain_height[,,]
+    volume = area[,] * height[,,]
+    model = lm(volume ~ height)
+  }
+}
+
+dim(height)
+```
+
+
+```{r}
+#Test with damvols as a .nc file
+#Issues with the values() function which only works on a raster, which is ultimately the output we want (or a .nc file). Right now we have them all as matrices 
+for (i in lat){
+  for (j in lon)
+  {
+    
+    #i=3
+    #j=61
+    #dim(damvol)
+    damvol = damvol
+    rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j]
+    floodvol = damvol - rivervol
+    area = HYMAP_grid_area[i,j]
+    height = HYMAP_floodplain_height[i,j,]
+    volume = HYMAP_grid_area[i,j] * HYMAP_floodplain_height[i,j,]
+    model = lm(volume ~ height)
+    m = coef(model)[2]
+    b = coef(model)[1]
+    floodheight = (floodvol - b)/m
+    floodheight[floodheight < 0] = 0
+    #totaldamheights = floodheight + HYMAP_river_height[i,j]
+    #print(floodheight)
+  }
+} 
+dim(volume)
+
+class(damvol)
+plot(floodheight, colNA="grey70")
+plot(totaldamheights,1, colNA="grey70")
+
+```
+```{r}
+#Test with damvols as a raster
+for (i in 1:length(lat)){
+  for (j in 1:length(lon)){
+    rvol_cell= rvol
+    rivervol_cell = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j]
+    #floodvol_cell = rvol_cell - rivervol_cell
+    #area = HYMAP_grid_area[i,j]
+    #height = HYMAP_floodplain_height[i,j,]
+    #volume = area * height
+    #model = lm(volume ~ height)
+   # m = coef(model)[2]
+   # b = coef(model)[1]
+    
+    #floodheight = (floodvol_cell - b)/m
+    #values(floodheight)[values(floodheight) < 0] = 0
+    #totaldamheights = floodheight + HYMAP_river_height[i,j]
+  }
+} 
+summary(model)
+dim(floodvol_cell)
+plot(floodheight,1, colNA="grey70")
+plot(totaldamheights,1, colNA="grey70")
+```
 ```{r}
 HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
 HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
@@ -910,17 +1052,10 @@ damvol <- rvol
 for (i in 1:lon){
   for (j in 1:lat)
     damvol = damvol
-    rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j]
-    floodvol = damvol[i,j] - rivervol
-}
-
-for (i in 1:lon){
-  for (j in 1:lat)
-    damvol = damvol
-    rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j]
+    rivervol = HYMAP_river_width[,] * HYMAP_river_length[,] * HYMAP_river_height[,]
     floodvol = damvol - rivervol
-    area = HYMAP_grid_area[i,j]
-    height = HYMAP_floodplain_height[i,j,]
+    area = HYMAP_grid_area[,]
+    height = HYMAP_floodplain_height[,,]
     volume = area * height
     model = lm(volume ~ height)
     m = coef(model)[2]
@@ -928,15 +1063,13 @@ for (i in 1:lon){
     floodheight = (floodvol-b)/m
     values(floodheight)[values(floodheight) < 0] = 0
     totaldamheights = floodheight + HYMAP_river_height[i,j]
-    #print(floodheight)
 } 
 
 
 plot(floodheight,1, colNA="grey70")
 plot(totaldamheights,1, colNA="grey70")
-
-
 ```
+
 
 #make NetCDF file
 ```{r}
@@ -945,7 +1078,11 @@ plot(totaldamheights,1, colNA="grey70")
 writeCDF(floodheight,"beaverdamheights.nc",overwrite=TRUE)
 writeCDF(totaldamheights,"totaldamheights.nc",overwrite=TRUE)
 image(lat,lon,lyr.1)
-  
+
+beaverdamheights <- nc_open("beaverdamheights.nc")
+attributes(inputs$var)
+attributes(inputs$dim)
+image(lon, lat, beaverdamheights)
 ```
 
 

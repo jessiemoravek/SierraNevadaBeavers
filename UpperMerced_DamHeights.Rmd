@@ -1,0 +1,283 @@
+---
+title: "UpperMerced_DamHeights"
+output: html_document
+date: "2023-10-19"
+---
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(dataRetrieval)
+library(ggsn)
+library(sf)
+library(maps)
+library(sp)
+library(ncdf4)
+library(terra)
+```
+
+#Import data
+##Dam volumes
+```{r}
+vol_by_grid5 <- readRDS("vol_by_grid5.rds")
+
+#volumes
+rvol <- vol_by_grid5
+
+#make it a raster
+rvol <- rast(ncols = 174, nrows = 63, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
+rvol
+values(rvol) <- vol_by_grid5$total_vol_in_cell 
+plot(rvol,1, colNA="grey70") #hmm upside down
+rvol  <- flip(rvol, direction="vertical")
+plot(rvol,1, colNA="grey70")
+```
+
+##Lis inputs 
+```{r}
+#lis inputs
+inputs <- nc_open("lis_input.nc")
+
+attributes(inputs$var)
+attributes(inputs$dim)
+
+```
+
+##Organize Inputs data 
+```{r}
+# Get latitude and longitude with the ncvar_get function and store each into their own object:
+lat <- ncvar_get(inputs, "lat")
+nlat <- dim(lat) #to check it matches the metadata: 63
+lon <- ncvar_get(inputs, "lon")
+nlon <- dim(lon) #to check, should be 174
+# Check your lat lon dimensions match the information in the metadata we explored before:
+print(c(nlon, nlat))
+#interesting they do not match. Lat and Lon are both stored as two dimensional data arrays. Let's select just the unique lats and longs from those arrays: 
+
+lat <- lat[1,]
+lon <- lon[,1]
+
+class(lat)
+dim(lat)
+#now pull an array
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+dim(HYMAP_grid_area) #to check; this should give you 174 and 63
+
+```
+##Pull matrices for for loop
+```{r}
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
+HYMAP_river_width <- ncvar_get(inputs, "HYMAP_river_width")
+HYMAP_river_length <- ncvar_get(inputs, "HYMAP_river_length")
+HYMAP_river_height <- ncvar_get(inputs, "HYMAP_river_height")
+damvol <- rvol
+```
+
+##For loop using raster
+```{r}
+for (i in 1:length(lon)){
+  for (j in 1:length(lat)){
+    damvol = damvol
+    rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j]* HYMAP_river_height[i,j]
+    floodvol = damvol - rivervol
+    area = HYMAP_grid_area[i,j]
+    height = HYMAP_floodplain_height[i,j,]
+    volume = area * height
+    model = lm(volume ~ height)
+    m = coef(model)[2]
+    b = coef(model)[1]
+    floodheight = (floodvol-b)/m
+    values(floodheight)[values(floodheight) < 0] = 0
+    totaldamheights = floodheight + HYMAP_river_height[i,j]
+  }
+} 
+
+as.data.frame(lat)
+lat <- as.matrix(lat, wide=F)
+class(lat)
+plot(floodheight,1, colNA="grey70")
+plot(totaldamheights,1, colNA="grey70")
+```
+##make .nc file out of rvol
+```{r}
+writeCDF(rvol,"rvol4.nc", overwrite=TRUE)
+
+rvolnc <- nc_open("rvol4.nc")
+print(rvolnc)
+
+# Get latitude and longitude with the ncvar_get function and store each into their own object:
+  lat <- ncvar_get(rvolnc, "latitude")
+  nlat <- dim(lat) #to check it matches the metadata: 63
+  lon <- ncvar_get(rvolnc, "longitude")
+  nlon <- dim(lon) #to check, should be 174
+  # Check your lat lon dimensions match the information in the metadata we explored before:
+  print(c(nlon, nlat))
+
+attributes(rvolnc$var)
+attributes(rvolnc$dim)
+
+#now pull an array
+total_vol_in_cell <- ncvar_get(rvolnc, "rvol4")
+dim(total_vol_in_cell) #to check; this should give you 174 and 63
+
+```
+
+##Pull volume for .nc for loop
+```{r}
+total_vol_in_cell <- ncvar_get(rvolnc, "rvol4")
+damvolnc <- total_vol_in_cell
+```
+
+## for loop with .nc file
+
+```{r}
+for (i in 1:length(lon)){
+  for (j in 1:length(lat)){
+    damvolnc = damvolnc
+    rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j]
+    floodvol = damvolnc - rivervol
+    area = HYMAP_grid_area[i,j]
+    height = HYMAP_floodplain_height[i,j,]
+    volume = area * height
+    model = lm(volume ~ height)
+    m = coef(model)[2]
+    b = coef(model)[1]
+    floodheight = (floodvol-b)/m
+    floodheight[floodheight < 0] = 0
+    totaldamheights = floodheight + HYMAP_river_height[i,j]
+  }
+} 
+dim(floodheight)
+length(lat)
+
+floodheight_r <- rast(nrows = 63, ncols = 174, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
+floodheight_r  <- t(floodheight_r)
+
+floodheight_r
+values(floodheight_r) <- floodheight 
+plot(floodheight_r,1, colNA="grey70") #hmm upside down
+floodheight_r  <- t(floodheight_r)
+plot(floodheight_r,1, colNA="grey70")
+```
+
+
+```{r}
+dim(totaldamheights)
+length(lat)
+
+totaldamheights_r <- rast(nrows = 63, ncols = 174, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
+totaldamheights_r  <- t(totaldamheights_r)
+
+totaldamheights_r
+values(totaldamheights_r) <- totaldamheights 
+plot(totaldamheights_r,1, colNA="grey70") #hmm upside down
+totaldamheights_r  <- t(totaldamheights_r)
+plot(totaldamheights_r,1, colNA="grey70")
+
+```
+
+```{r}
+olddamheights <- nc_open("totaldamheights.nc")
+attributes(olddamheights$var)
+attributes(olddamheights$dim)
+# Get latitude and longitude with the ncvar_get function and store each into their own object:
+lat <- ncvar_get(olddamheights, "latitude")
+nlat <- dim(lat) #to check it matches the metadata: 64
+lon <- ncvar_get(olddamheights, "longitude")
+nlon <- dim(lon) #to check, should be 173
+# Check your lat lon dimensions match the information in the metadata we explored before:
+print(c(nlon, nlat))
+
+
+#now pull an array
+olddamheights <- ncvar_get(olddamheights, "totaldamheights")
+olddamheights <- olddamheights[,] 
+
+olddamheights_r <- rast(nrows = 63, ncols = 174, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
+olddamheights_r  <- t(olddamheights_r)
+
+olddamheights_r
+values(olddamheights_r) <- olddamheights 
+plot(totaldamheights_r,1, colNA="grey70") 
+
+olddamheights_r  <- t(olddamheights_r)
+plot(olddamheights_r,1, colNA="grey70")
+
+#The old dam heights calculations were lower than the new ones for some reason
+
+```
+
+
+#Practice code
+```{r}
+# Create a small 2x3x4 array
+height_array <- array(cumsum(abs(rnorm(24))), dim = c(5, 5, 10))
+
+# Print the array
+print(height_array)
+height_1 <- height_array[1,1,]
+
+#multiply by arrea
+
+area_matrix <- matrix(cumsum(abs(rnorm(24))), 5, 5)
+
+area_1 <- area_matrix[1,1]
+
+volume_1 <- height_1 * area_1
+plot(height_1, volume_1)
+
+model_1<-lm(volume_1 ~ height_1)
+
+m <- coef(model_1)[2]
+b <- coef(model_1)[1]
+
+damvol <- 3
+
+floodheight <- (damvol - b )/m
+class(height_array)
+```
+
+
+```{r}
+for (i in 1:nrow(area_matrix)){
+  for (j in 1:ncol(area_matrix)){
+    area = area_matrix[i,j]
+    height = height_array[i,j,]
+    volume = area * height
+    model = lm(volume ~ height)
+    m = coef(model)[2]
+    b = coef(model)[1]
+    damvol = 2
+    floodheight = (damvol-b)/m
+    print(floodheight)
+ }}   
+    
+#1.078682
+```
+```{r}
+
+# Define the number of rows and columns for a matrix
+num_rows <- 3
+num_cols <- 4
+
+# Create an empty matrix
+my_matrix <- matrix(0, nrow = num_rows, ncol = num_cols)
+
+# Nested for loop to fill the matrix with values
+for (i in 1:num_rows) {
+  for (j in 1:num_cols) {
+    # Generate a value for the matrix (you can replace this with your own logic)
+    value <- i * j #NOTE that if you run just "value" you only get one value but that's not the actual vlaue applied to the entire matrix
+    
+    
+    # Assign the value to the matrix
+    my_matrix[i, j] <- value
+  }
+}
+
+# Print the resulting matrix
+print(my_matrix)
+```
+
+
