@@ -1,0 +1,951 @@
+---
+title: "UpperMerced_Volumes"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(dataRetrieval)
+library(ggsn)
+library(sf)
+library(maps)
+library(sp)
+library(ncdf4)
+#library(terra)
+```
+
+#Maps
+##Get UM boundary shapefile
+```{r}
+getwd()
+
+# Unzip the shapefile
+#unzip("WBD_18_HU2_Shape.zip")
+
+# Read in the shapefile with st_read()
+#shapefile <- st_read("C:/Users/jessi/Desktop/SierraNevadaBeavers/SierraNevadaBeavers/Shape/WBDHU8.shp")
+
+# Select just the Upper Merced Watershed
+#UM_boundary <- st_write(shapefile[shapefile$huc8=="18040008",], "UM_boundary.shp", append = FALSE)
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "WBD_18_HU2_Shape*",recursive = F))
+
+#Project to California Teal Albers (NAD83) EPSG code 3310
+#UM_boundary <- st_transform(UM_boundary, 3310)
+
+#saveRDS(UM_boundary,"UM_boundary")
+UM_boundary <- readRDS("UM_boundary")
+
+```
+##UM Boundary Map
+```{r}
+ggplot() +
+    geom_sf(data = UM_boundary) +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle("Upper Merced)") + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(UM_boundary, symbol=10, location="bottomright") + 
+    scalebar(UM_boundary,
+             dist=10, dist_unit="km", st.size = 3,
+             transform=FALSE)
+```
+
+
+#Import Practice Shapefile
+
+```{r}
+getwd()
+
+# Read in the shapefile with st_read()
+#damCapClip <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity_Clip.shp")
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "DamCapacity_Clip*",recursive = F))
+
+#Project to California Teal Albers (NAD83) EPSG code 3310
+#damCapClip <- st_transform(damCapClip, 3310)
+
+#saveRDS(damCapClip,"damCapClip.shp")
+damCapClip <- readRDS("damCapClip.shp")
+```
+##Visualize
+```{r}
+ggplot() +
+    geom_sf(data = damCapClip) +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle("Dam Capacity Clipped Area") + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    north(damCapClip, symbol=10, location="bottomright") + 
+    scalebar(damCapClip,
+             dist=.5, dist_unit="km", st.size = 3,
+             transform=FALSE)
+```
+
+
+##Attribute table
+```{r}
+names(damCapClip)
+damCapClip$iGeo_Slope
+```
+#Volume and Surface Area calculation
+```{r}
+damCapClip_v <- damCapClip
+for (i in damCapClip_v){ #for each stream segment in the BRAT model output shapefile
+  damCt <- damCapClip_v$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_EX_CT in the attribute table)
+  slope <- damCapClip_v$iGeo_Slope #meters
+  da <- damCapClip_v$iGeo_DA #m2
+  width <- ifelse(da < 4.95,2.18*(da)^0.191,
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
+  height <- 1 #assume all beaver dams are 1m tall
+  length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
+  maxLength<- (damCapClip_v$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
+  volume <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt))
+  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damCt),(width)*(maxLength)*(damCt))
+  damCapClip_v$width <- width
+  damCapClip_v$volume <- volume #m3
+  damCapClip_v$surfaceArea <- surfaceArea #m2
+} 
+
+saveRDS(damCapClip_v,"damCapClip_v.rds")
+```
+
+
+##Create 1km grid
+```{r}
+#Check if sf object is in metric CRS (i.e. projected)
+st_is_longlat(damCapClip)
+#st_is_longlat returns "False" which means that the object damCapClip is in a metric CRS
+
+#CRS 3310 is in units of meters (see here https://epsg.io/3310)
+grid_spacing <- 1000 
+
+grid1 <- st_make_grid(damCapClip, square = T, cellsize = c(grid_spacing, grid_spacing)) %>% # the grid, covering bounding box
+  st_sf()
+
+#add an id column
+grid1 <- mutate(grid1, id = 1:nrow(grid1))
+```
+
+
+
+
+##Volume by grid cell
+```{r}
+intersection <- st_intersection(grid1, damCapClip_v) %>% 
+  mutate(length = st_length(.)) %>% #creates a "length" column that is the length of that particular segment in the grid cell from the "id" column
+  st_drop_geometry() # complicates things in joins later on
+
+grid1 <- grid1 %>% 
+  left_join(intersection, by = "id")
+
+vol_by_grid <- grid1 %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_vol_in_cell = percent_len_in_cell*volume) %>% 
+  group_by(id) %>% summarize(total_vol_in_cell = sum(segment_vol_in_cell))
+
+
+vol_by_grid$total_vol_in_cell <- as.numeric(vol_by_grid$total_vol_in_cell) #convert volume col to numeric
+```
+```{r}
+ggplot() +
+    geom_sf(data = vol_by_grid, aes(fill = total_vol_in_cell), color = NA) +
+    geom_sf(data = damCapClip, col = "blue") +
+    scale_fill_gradient2(low = "#132B43", high = "#078FF7") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Volume per ", km^2))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapClip, symbol=10, location="bottomleft") + 
+    scalebar(vol_by_grid,
+             dist=.5, dist_unit="km", st.size = 3, transform= F) +
+    guides(fill = guide_colorbar(title = expression(paste(m^3)),
+                             title.position = "bottom",
+                             title.theme = element_text(size = 10,
+                                                        colour = "gray70",
+                                                        angle = 0)))
+
+summary(vol_by_grid$total_vol_in_cell,na.rm=T)
+summary(damCapClip$mCC_EX_CT)
+```
+
+##Surface Area by grid cell
+```{r}
+#use grid1 (after doing the leftjoin above for volume calculations)
+
+sa_by_grid <- grid1 %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_sa_in_cell = percent_len_in_cell*surfaceArea) %>% 
+  group_by(id) %>% summarize(total_sa_in_cell = sum(segment_sa_in_cell))
+
+sa_by_grid
+sa_by_grid$total_sa_in_cell <- as.numeric(sa_by_grid$total_sa_in_cell) #convert volume col to numeric
+```
+
+```{r}
+ggplot() +
+    geom_sf(data = sa_by_grid, aes(fill = total_sa_in_cell), color = NA) +
+    geom_sf(data = damCapClip, col = "blue") +
+    scale_fill_gradient2(low = "#43132B", high = "#F7078F") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Surface Area per ", km^2))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapClip, symbol=10, location="bottomleft") + 
+    scalebar(vol_by_grid,
+             dist=.5, dist_unit="km", st.size = 3, transform= F) +
+    guides(fill = guide_colorbar(title = expression(paste(m^2)),
+                             title.position = "bottom",
+                             title.theme = element_text(size = 10,
+                                                        colour = "gray70",
+                                                        angle = 0)))
+
+median(vol_by_grid$total_vol_in_cell,na.rm=T)
+```
+
+#Upper Merced
+##Bounding Box
+```{r}
+#This box aligns with this LIS model coordinates
+#getwd()
+
+# Read in the shapefile with st_read()
+#boundingBox <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/BoundingBox.shp")
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "BoundingBox*",recursive = F))
+
+#Project to California Teal Albers (NAD83) EPSG code 3310
+#boundingBox <- st_transform(boundingBox, 3310)
+
+#saveRDS(boundingBox,"boundingBox")
+boundingBox <- readRDS("boundingBox")
+```
+##Dam Capacity
+```{r}
+#This box aligns with this LIS model coordinates
+#getwd()
+
+# Read in the shapefile with st_read()
+#damCapacity <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity.shp")
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "damCapacity*",recursive = F))
+
+#Project to California Teal Albers (NAD83) EPSG code 3310
+#damCapacity <- st_transform(damCapacity, 3310)
+
+#saveRDS(damCapacity,"damCapacity")
+damCapacity <- readRDS("damCapacity")
+```
+##Create 1km grid
+```{r}
+#Check if sf object is in metric CRS (i.e. projected)
+st_is_longlat(boundingBox)
+#st_is_longlat returns "False" which means that the object is in a metric CRS
+
+#CRS 3310 is in units of meters (see here https://epsg.io/3310)
+grid_spacing <- 1000 
+
+grid2 <- st_make_grid(boundingBox, square = T, cellsize = c(grid_spacing, grid_spacing)) %>% # the grid, covering bounding box
+  st_sf()
+
+#add an id column
+grid2 <- mutate(grid2, id = 1:nrow(grid2))
+```
+
+###Map
+```{r}
+ggplot() +
+    geom_sf(data = grid2, fill = NA) +
+    geom_sf(data = damCapacity, col = "blue") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Upper Merced 1km Grid"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapacity, symbol=10, location="bottomright") + 
+    scalebar(damCapacity,
+             dist=10, dist_unit="km", st.size = 3, transform= F) 
+```
+##Volume and Surface Area calculation
+```{r}
+damCapacity_v <- damCapacity
+for (i in damCapacity_v){ #for each stream segment in the BRAT model output shapefile
+  damDens <- damCapacity_v$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_EX_CT in the attribute table)
+  slope <- damCapacity_v$iGeo_Slope #meters
+  da <- damCapacity_v$iGeo_DA #m2
+  width <- ifelse(da < 4.95,2.18*(da)^0.191,
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
+  length <- 1/slope 
+  maxLength<- (damCapacity_v$iGeo_Len/damCapacity_v$mCC_EX_CT)
+    volume <- ifelse(length < maxLength, 0.5*1*(width)*(length)*(damDens),1*(width)*(maxLength)*(damDens))
+  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damDens),(width)*(maxLength)*(damDens))
+  damCapacity_v$width <- width
+  damCapacity_v$volume <- volume #m3
+  damCapacity_v$surfaceArea <- surfaceArea #m2
+} 
+
+saveRDS(damCapacity_v,"damCapacity_v.rds")
+```
+
+##Volume by grid cell
+```{r}
+intersection2 <- st_intersection(grid2, damCapacity_v) %>% 
+  mutate(length = st_length(.)) %>% #creates a "length" column that is the length of that particular segment in the grid cell from the "id" column
+  st_drop_geometry() # complicates things in joins later on
+
+grid2 <- grid2 %>% 
+  left_join(intersection2, by = "id")
+
+vol_by_grid2 <- grid2 %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_vol_in_cell = percent_len_in_cell*volume) %>% 
+  group_by(id) %>% summarize(total_vol_in_cell = sum(segment_vol_in_cell))
+
+vol_by_grid2$total_vol_in_cell <- as.numeric(vol_by_grid2$total_vol_in_cell) #convert volume col to numeric
+saveRDS(vol_by_grid2,"vol_by_grid2.rds")
+```
+###Map
+```{r}
+ggplot() +
+    geom_sf(data = vol_by_grid2, aes(fill = total_vol_in_cell), color = NA) +
+    geom_sf(data = damCapacity, col = "blue") +
+    scale_fill_gradient2(limits = c(0.01,76810.52),low = "#132B43", high = "#078FF7") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Volume per ", km^2))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapacity, symbol=10, location="bottomleft") + 
+    scalebar(vol_by_grid2,
+             dist=20, dist_unit="km", st.size = 3, transform= F) +
+    guides(fill = guide_colorbar(title = expression(paste(m^3)),
+                             title.position = "bottom",
+                             title.theme = element_text(size = 10,
+                                                        colour = "gray70",
+                                                        angle = 0)))
+0:150
+?scale_fill_gradient2
+summary(vol_by_grid2$total_vol_in_cell,na.rm=T)
+```
+##Surface Area by grid cell
+```{r}
+#use grid2 (after doing the leftjoin above for volume calculations)
+
+sa_by_grid2 <- grid2 %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_sa_in_cell = percent_len_in_cell*surfaceArea) %>% 
+  group_by(id) %>% summarize(total_sa_in_cell = sum(segment_sa_in_cell))
+
+sa_by_grid2$total_sa_in_cell <- as.numeric(sa_by_grid2$total_sa_in_cell) #convert volume col to numeric
+
+saveRDS(sa_by_grid2,"sa_by_grid2")
+```
+###Map
+```{r}
+ggplot() +
+    geom_sf(data = sa_by_grid2, aes(fill = total_sa_in_cell), color = NA) +
+    #geom_sf(data = damCapacity, col = "blue") +
+    scale_fill_gradient2(limits = c(0,10000), low = "#43132B", high = "#F7078F") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Surface Area per ", km^2))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapacity, symbol=10, location="bottomleft") + 
+    scalebar(vol_by_grid2,
+             dist=20, dist_unit="km", st.size = 3, transform= F) +
+    guides(fill = guide_colorbar(title = expression(paste(m^2)),
+                             title.position = "bottom",
+                             title.theme = element_text(size = 10,
+                                                        colour = "gray70",
+                                                        angle = 0)))
+0:150
+?scale_fill_gradient2
+summary(sa_by_grid2$total_sa_in_cell,na.rm=T)
+```
+
+#Investigate outliers
+```{r}
+vol_by_grid2
+sa_by_grid2
+
+hist(vol_by_grid2$total_vol_in_cell)
+summary(vol_by_grid2$total_vol_in_cell)
+
+vol_by_grid2 %>% arrange(desc(total_vol_in_cell))
+```
+```{r}
+ggplot() +
+    geom_sf(data = vol_by_grid2, aes(fill = total_vol_in_cell), color = NA) +
+    geom_sf(data = damCapacity, col = "blue") +
+    scale_fill_gradient2(limits = c(10000,52628.57442), low = "#43132B", high = "#F7078F") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Volume per ", km^2))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapacity, symbol=10, location="bottomleft") + 
+    scalebar(vol_by_grid2,
+             dist=20, dist_unit="km", st.size = 3, transform= F) +
+    guides(fill = guide_colorbar(title = expression(paste(m^3)),
+                             title.position = "bottom",
+                             title.theme = element_text(size = 10,
+                                                        colour = "gray70",
+                                                        angle = 0)))
+```
+#Re-do Dam Capacity
+##Note that we weren't using the correct max DA
+##Bounding Box
+```{r}
+#This box aligns with this LIS model coordinates
+#getwd()
+
+# Read in the shapefile with st_read()
+#boundingBox2 <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/BoundingBox2.shp")
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "BoundingBox*",recursive = F))
+
+#Project to California Teal Albers (NAD83) EPSG code 3310
+boundingBox2 <- readRDS("boundingBox2")
+
+boundingBox2 <- st_transform(boundingBox2, 3310)
+
+saveRDS(boundingBox2,"boundingBox2")
+```
+##Dam Capacity
+```{r}
+#This box aligns with this LIS model coordinates
+#getwd()
+
+# Read in the shapefile with st_read()
+#damCapacity2 <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity2.shp")
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "damCapacity2*",recursive = F))
+
+#Project to California Teal Albers (NAD83) EPSG code 3310
+damCapacity2 <- readRDS("damCapacity2")
+
+damCapacity2 <- st_transform(damCapacity2, 3310)
+saveRDS(damCapacity2,"damCapacity2")
+```
+
+##Create 1km grid
+```{r}
+#Check if sf object is in metric CRS (i.e. projected)
+st_is_longlat(boundingBox2)
+#st_is_longlat returns "False" which means that the object is in a metric CRS
+
+#CRS 3310 is in units of meters (see here https://epsg.io/3310)
+grid_spacing <- 1000 
+
+grid3 <- st_make_grid(boundingBox2, square = T, cellsize = c(grid_spacing, grid_spacing)) %>% # the grid, covering bounding box
+  st_sf()
+
+#add an id column
+grid3 <- mutate(grid3, id = 1:nrow(grid3))
+dim(grid3)
+```
+
+###Map
+```{r}
+ggplot() +
+    geom_sf(data = grid3, fill = NA) +
+    geom_sf(data = damCapacity2, col = "blue") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Upper Merced 1km Grid"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapacity2, symbol=10, location="bottomright") + 
+    scalebar(damCapacity2,
+             dist=10, dist_unit="km", st.size = 3, transform= F) 
+```
+
+##Volume and Surface Area calculation
+```{r}
+damCapacity2_v <- damCapacity2
+for (i in damCapacity2_v){ #for each stream segment in the BRAT model output shapefile
+  damCt <- damCapacity2_v$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_EX_CT in the attribute table)
+  slope <- damCapacity2_v$iGeo_Slope #meters
+  da <- damCapacity2_v$iGeo_DA #m2
+  width <- ifelse(da < 4.95,2.18*(da)^0.191,
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
+  height <- 1 #assume all beaver dams are 1m tall
+  length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
+  maxLength<- (damCapacity2_v$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
+  volume <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt))
+  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damCt),(width)*(maxLength)*(damCt))
+  damCapacity2_v$width <- width
+  damCapacity2_v$volume <- volume #m3
+  damCapacity2_v$surfaceArea <- surfaceArea #m2
+} 
+
+saveRDS(damCapacity2_v,"damCapacity2_v.rds")
+```
+
+##Volume by grid cell
+```{r}
+intersection3 <- st_intersection(grid3, damCapacity2_v) %>% 
+  mutate(length = st_length(.)) %>% #creates a "length" column that is the length of that particular segment in the grid cell from the "id" column
+  st_drop_geometry() # complicates things in joins later on
+
+grid3 <- grid3 %>% 
+  left_join(intersection3, by = "id")
+
+vol_by_grid3 <- grid3 %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_vol_in_cell = percent_len_in_cell*volume) %>% 
+  group_by(id) %>% summarize(total_vol_in_cell = sum(segment_vol_in_cell))
+
+vol_by_grid3$total_vol_in_cell <- as.numeric(vol_by_grid3$total_vol_in_cell) #convert volume col to numeric
+saveRDS(vol_by_grid3,"vol_by_grid3.rds")
+vol_by_grid3 <- readRDS("vol_by_grid3.rds")
+sum(vol_by_grid3$total_vol_in_cell, na.rm=T)
+
+```
+###Map
+```{r}
+ggplot() +
+    geom_sf(data = vol_by_grid3, aes(fill = total_vol_in_cell), color = NA) +
+    #geom_sf(data = damCapacity2, col = "blue") +
+    scale_fill_gradient2(low = "gray70", high = "#078FF7") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Volume per ", km^2))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapacity2, symbol=10, location="bottomleft") + 
+    scalebar(vol_by_grid3,
+             dist=20, dist_unit="km", st.size = 3, transform= F) +
+    guides(fill = guide_colorbar(title = expression(paste(m^3)),
+                             title.position = "bottom",
+                             title.theme = element_text(size = 10,
+                                                        colour = "gray70",
+                                                        angle = 0)))
+
+?scale_fill_gradient2
+summary(vol_by_grid3$total_vol_in_cell,na.rm=T)
+sum(vol_by_grid3$total_vol_in_cell,na.rm=T)
+```
+
+
+
+
+
+
+##Surface Area by grid cell
+```{r}
+#use grid3 (after doing the leftjoin above for volume calculations)
+
+sa_by_grid3 <- grid3 %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_sa_in_cell = percent_len_in_cell*surfaceArea) %>% 
+  group_by(id) %>% summarize(total_sa_in_cell = sum(segment_sa_in_cell))
+
+sa_by_grid3$total_sa_in_cell <- as.numeric(sa_by_grid3$total_sa_in_cell) #convert volume col to numeric
+
+saveRDS(sa_by_grid3,"sa_by_grid3.rds")
+sa_by_grid3 <- readRDS('sa_by_grid3.rds')
+
+```
+###Map
+```{r}
+ggplot() +
+    geom_sf(data = sa_by_grid3, aes(fill = total_sa_in_cell), color = NA) +
+    #geom_sf(data = damCapacity2, col = "blue") +
+    scale_fill_gradient2(low = "gray70", high = "#F7078F") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Surface Area per ", km^2))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "transparent")) +
+    north(damCapacity2, symbol=10, location="bottomleft") + 
+    scalebar(vol_by_grid3,
+             dist=20, dist_unit="km", st.size = 3, transform= F) +
+    guides(fill = guide_colorbar(title = expression(paste(m^2)),
+                             title.position = "bottom",
+                             title.theme = element_text(size = 10,
+                                                        colour = "gray70",
+                                                        angle = 0)))
+
+?scale_fill_gradient2
+summary(sa_by_grid3$total_sa_in_cell,na.rm=T)
+```
+##Reproject for rasterization 
+```{r}
+vol_by_grid3_wgs <- st_transform(vol_by_grid3, 4326)
+sa_by_grid3_wgs <- st_transform(sa_by_grid3, 4087)
+
+saveRDS(vol_by_grid3_wgs, "vol_by_grid3_wgs.rds")
+saveRDS(sa_by_grid3_wgs, "sa_by_grid3_wgs.rds")
+```
+
+
+
+
+
+
+
+
+
+
+#FINAL GRID IN CORRECT NASA CRS
+```{r}
+library(sf)
+library(sp)
+library(raster)
+library(lwgeom)
+```
+##NASA projection
+```{r}
+wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
+```
+
+
+##Dam Capacity
+```{r}
+#This box aligns with this LIS model coordinates
+#getwd()
+
+# Read in the shapefile with st_read()
+#damCapacity2 <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity2.shp")
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "damCapacity2*",recursive = F))
+
+#Project to California Teal Albers (NAD83) EPSG code 3310
+damCapacity2 <- readRDS("damCapacity2")
+
+damCapacity2 <- st_transform(damCapacity2, wkt)
+saveRDS(damCapacity2,"damCapacity2")
+```
+
+##Making a grid
+```{r}
+xmin <- -120.985
+xmax <- -119.255
+ymin <- 37.325
+ymax <- 37.925
+extent <- extent(xmin, xmax, ymin, ymax)
+
+study_area2 <- st_bbox(extent, crs = st_crs(wkt))
+
+study_area3 = st_bbox(st_transform(st_as_sfc(study_area2), crs = wkt))
+#cellsize = (c(diff(study_area3[c(1, 3)]), diff(study_area3[c(2, 4)])))/n, 
+
+study_area4 = st_make_grid(study_area3, n = c(174,63))
+
+study_area5 = st_as_sf(study_area4)
+class(study_area5)
+
+#add an id column
+study_area5$id=1:length(study_area4)
+```
+##Volume and Surface Area calculation
+```{r}
+damCapacity2_v <- damCapacity2
+for (i in damCapacity2_v){ #for each stream segment in the BRAT model output shapefile
+  damCt <- damCapacity2_v$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_EX_CT in the attribute table)
+  slope <- damCapacity2_v$iGeo_Slope #meters
+  da <- damCapacity2_v$iGeo_DA #m2
+  width <- ifelse(da < 4.95,2.18*(da)^0.191,
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
+  height <- 1 #assume all beaver dams are 1m tall
+  length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
+  maxLength<- (damCapacity2_v$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
+  volume <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt))
+  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damCt),(width)*(maxLength)*(damCt))
+  damCapacity2_v$width <- width
+  damCapacity2_v$volume <- volume #m3
+  damCapacity2_v$surfaceArea <- surfaceArea #m2
+} 
+
+
+saveRDS(damCapacity2_v,"damCapacity2_v.rds")
+```
+
+##Volume by grid cell
+```{r}
+sf_use_s2(FALSE)
+intersection5 <- st_intersection(study_area5, damCapacity2_v) %>% 
+  mutate(length = st_length(.)) %>% #creates a "length" column that is the length of that particular segment in the grid cell from the "id" column
+  st_drop_geometry() # complicates things in joins later on
+
+study_area5 <- study_area5 %>% 
+  left_join(intersection5, by = "id")
+
+vol_by_grid5 <- study_area5 %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_vol_in_cell = percent_len_in_cell*volume) %>% 
+  group_by(id) %>% summarize(total_vol_in_cell = sum(segment_vol_in_cell))
+
+vol_by_grid5$total_vol_in_cell <- as.numeric(vol_by_grid5$total_vol_in_cell) #convert volume col to numeric
+
+saveRDS(vol_by_grid5,"vol_by_grid5.rds")
+vol_by_grid5 <- readRDS("vol_by_grid5.rds")
+
+```
+
+###Map
+```{r}
+
+ggplot() +
+    geom_sf(data = vol_by_grid5, aes(fill = total_vol_in_cell), color = NA) +
+    #geom_sf(data = damCapacity2, col = "blue") +
+    scale_fill_gradient2(low = "gray70", high = "#078FF7") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Volume per ", km^2))) + 
+    theme_minimal() 
+```
+```{r}
+vol_by_grid5
+```
+
+
+##make NetCDF file
+```{r}
+#only need to run this once
+#st_write(vol_by_grid5, "vol_by_grid5.nc")
+```
+
+
+#Writing the code in R instead of Python
+##Practice code
+```{r}
+# Create a small 2x3x4 array
+height_array <- array(cumsum(abs(rnorm(24))), dim = c(5, 5, 10))
+
+# Print the array
+print(height_array)
+height_1 <- height_array[1,1,]
+
+#multiply by arrea
+
+area_matrix <- matrix(cumsum(abs(rnorm(24))), 5, 5)
+
+area_1 <- area_matrix[1,1]
+
+volume_1 <- height_1 * area_1
+plot(height_1, volume_1)
+
+model_1<-lm(volume_1 ~ height_1)
+
+m <- coef(model_1)[2]
+b <- coef(model_1)[1]
+
+damvol <- 3
+
+floodheight <- (damvol - b )/m
+
+for (i in 1:nrow(area_matrix)){
+  for (j in 1:ncol(area_matrix)){
+    area = area_matrix[i,j]
+    height = height_array[i,j,]
+    volume = area * height
+    model = lm(volume ~ height)
+    m = coef(model)[2]
+    b = coef(model)[1]
+    damvol = 2
+    floodheight = (damvol-b)/m
+    print(floodheight)
+ }}   
+    
+
+```
+
+
+##Import data
+###Dam volumes
+```{r}
+library(terra)
+vol_by_grid5 <- readRDS("vol_by_grid5.rds")
+
+#volumes
+rvol <- vol_by_grid5
+
+#make it a raster
+rvol <- rast(ncols = 174, nrows = 63, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
+rvol
+values(rvol) <- vol_by_grid5$total_vol_in_cell 
+plot(rvol,1, colNA="grey70") #hmm upside down
+rvol  <- flip(rvol, direction="vertical")
+plot(rvol,1, colNA="grey70")
+
+```
+
+###Lis inputs 
+```{r}
+#lis inputs
+inputs <- nc_open("lis_input.nc")
+print(inputs)
+
+attributes(inputs$var)
+attributes(inputs$dim)
+
+```
+
+##Organize Inputs data 
+```{r}
+# Get latitude and longitude with the ncvar_get function and store each into their own object:
+lat <- ncvar_get(inputs, "lat")
+nlat <- dim(lat) #to check it matches the metadata: 64
+lon <- ncvar_get(inputs, "lon")
+nlon <- dim(lon) #to check, should be 173
+# Check your lat lon dimensions match the information in the metadata we explored before:
+print(c(nlon, nlat))
+#interesting they do not match. Lat and Lon are both stored as two dimensional data arrays. Let's select just the unique lats and longs from those arrays: 
+
+lat <- lat[1,]
+lon <- lon[,1]
+
+
+#now pull an array
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+dim(HYMAP_grid_area) #to check; this should give you 174 and 63
+
+HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
+fld_hts <- ncatt_get(inputs, "HYMAP_floodplain_height", "fld_height_levels") #not sure what this is for
+dim(HYMAP_floodplain_height) #to check; this should give you 174 and 63 and 10
+
+elevation <- ncvar_get(inputs,"ELEVATION")
+dim(elevation)
+
+HYMAP_river_width <- ncvar_get(inputs,"HYMAP_river_width")
+dim(HYMAP_river_width)
+```
+
+
+##Practice slicing
+```{r}
+#slicing floodplain height
+HYMAP_floodplain_height_slice <- HYMAP_floodplain_height[,,2] 
+dim(HYMAP_floodplain_height_slice)
+# and why not, draw it out:
+image(lon, lat, HYMAP_floodplain_height_slice)
+
+
+#slicing grid area
+HYMAP_grid_area_slice <- HYMAP_grid_area[,] 
+dim(HYMAP_floodplain_height_slice)
+# and why not, draw it out:
+image(lon, lat, HYMAP_grid_area_slice)
+
+#slicing elevation
+elevation <- elevation[,] 
+dim(elevation)
+# and why not, draw it out:
+image(lon, lat, elevation)
+
+#slicing river width
+river_width <- HYMAP_river_width[,] 
+dim(river_width)
+# and why not, draw it out:
+image(lon, lat, river_width)
+```
+##Checking if linear models make sense
+```{r}
+HYMAP_floodplain_height_slice <- HYMAP_floodplain_height[37,46,] 
+HYMAP_grid_area_slice <- HYMAP_grid_area[37,46] 
+vol_slice <- HYMAP_floodplain_height_slice * HYMAP_grid_area_slice
+model_slice <- lm(vol_slice ~ HYMAP_floodplain_height_slice)
+plot(vol_slice~HYMAP_floodplain_height_slice)
+
+```
+```{r}
+HYMAP_floodplain_height_slice <- HYMAP_floodplain_height[138,58,] 
+HYMAP_grid_area_slice <- HYMAP_grid_area[138,58] 
+vol_slice <- HYMAP_floodplain_height_slice * HYMAP_grid_area_slice
+model_slice <- lm(vol_slice ~ HYMAP_floodplain_height_slice)
+plot(vol_slice~HYMAP_floodplain_height_slice)
+```
+
+```{r}
+HYMAP_floodplain_height_slice <- HYMAP_floodplain_height[102,2,] 
+HYMAP_grid_area_slice <- HYMAP_grid_area[102,2] 
+vol_slice <- HYMAP_floodplain_height_slice * HYMAP_grid_area_slice
+model_slice <- lm(vol_slice ~ HYMAP_floodplain_height_slice)
+plot(vol_slice~HYMAP_floodplain_height_slice)
+```
+
+```{r}
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
+HYMAP_river_width <- ncvar_get(inputs, "HYMAP_river_width")
+HYMAP_river_length <- ncvar_get(inputs, "HYMAP_river_length")
+HYMAP_river_height <- ncvar_get(inputs, "HYMAP_river_height")
+damvol <- rvol
+
+for (i in 1:length(lon)){
+  for (j in 1:length(lat))
+    damvol = damvol
+    rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j]
+    floodvol = damvol - rivervol
+}
+
+for (i in 1:length(lon)){
+  for (j in 1:length(lat))
+    damvol = damvol
+    rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j]
+    floodvol = damvol - rivervol
+    area = HYMAP_grid_area[i,j]
+    height = HYMAP_floodplain_height[i,j,]
+    volume = area * height
+    model = lm(volume ~ height)
+    m = coef(model)[2]
+    b = coef(model)[1]
+    floodheight = (floodvol-b)/m
+    values(floodheight)[values(floodheight) < 0] = 0
+    totaldamheights = floodheight + HYMAP_river_height[i,j]
+    #print(floodheight)
+} 
+
+plot(floodheight,1, colNA="grey70")
+plot(totaldamheights,1, colNA="grey70")
+
+
+```
+
+#make NetCDF file
+```{r}
+#only need to run this once
+?writeCDF
+writeCDF(floodheight,"beaverdamheights.nc",overwrite=TRUE)
+writeCDF(totaldamheights,"totaldamheights.nc",overwrite=TRUE)
+image(lat,lon,lyr.1)
+  
+```
+
+

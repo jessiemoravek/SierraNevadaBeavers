@@ -1,0 +1,215 @@
+---
+title: "UpperMerced_DamHeights_2"
+output: html_document
+date: "2024-01-11"
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(dataRetrieval)
+library(ggsn)
+library(sf)
+library(maps)
+library(sp)
+library(ncdf4)
+library(sf)
+library(sp)
+library(lwgeom)
+library(terra)
+library(raster)
+
+```
+
+
+##NASA projection
+```{r}
+wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
+```
+
+
+##Dam Capacity
+```{r}
+# Read in the shapefile with st_read()
+#damCapacity2 <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity2.shp")
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "damCapacity2*",recursive = F))
+
+# Read in shapefile from previously imported shapefile
+damCapacity2 <- readRDS("damCapacity2")
+
+#Project to wkt (NASA projection)
+damCapacity2 <- st_transform(damCapacity2, wkt)
+saveRDS(damCapacity2,"damCapacity2")
+```
+
+##Make a grid
+```{r}
+#Make a bounding box extent
+xmin <- -120.985
+xmax <- -119.255
+ymin <- 37.325
+ymax <- 37.925
+extent <- extent(xmin, xmax, ymin, ymax)
+
+#Make a bounding box in the correct projection
+study_area <- st_bbox(extent, crs = st_crs(wkt))
+
+#Is wkt in metric or lat/long coordinate system? st_is_longlat gives TRUE, so it is NOT in metric.
+st_is_longlat(study_area)
+
+#Make a grid of the correct size
+study_area = st_make_grid(study_area, n = c(174,63))
+
+#Convert to an sf dataframe for future manipulation
+study_area = st_as_sf(study_area)
+
+#Add an ID column
+study_area$id = 1:nrow(study_area)
+```
+
+##Volume calculation
+```{r}
+damCapacity2_v <- damCapacity2
+for (i in damCapacity2_v){ #for each stream segment in the BRAT model output shapefile
+  damCt <- damCapacity2_v$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_EX_CT in the attribute table)
+  slope <- damCapacity2_v$iGeo_Slope #meters
+  da <- damCapacity2_v$iGeo_DA #m2
+  width <- ifelse(da < 4.95,2.18*(da)^0.191,
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
+  height <- 1 #assume all beaver dams are 1m tall
+  length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
+  maxLength<- (damCapacity2_v$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
+  volume <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt))
+  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damCt),(width)*(maxLength)*(damCt))
+  damCapacity2_v$width <- width
+  damCapacity2_v$volume <- volume #m3
+  damCapacity2_v$surfaceArea <- surfaceArea #m2
+} 
+
+
+saveRDS(damCapacity2_v,"damCapacity2_v.rds")
+```
+
+##Volume by grid cell
+```{r}
+sf_use_s2(FALSE)
+intersection <- st_intersection(study_area, damCapacity2_v) %>% 
+  mutate(length = st_length(.)) %>% #creates a "length" column that is the length of that particular segment in the grid cell from the "id" column
+  st_drop_geometry() # complicates things in joins later on
+
+study_area <- study_area %>% 
+  left_join(intersection, by = "id")
+
+vol_by_grid <- study_area %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_vol_in_cell = percent_len_in_cell*volume) %>% 
+  group_by(id) %>% summarize(total_vol_in_cell = sum(segment_vol_in_cell))
+
+vol_by_grid$total_vol_in_cell <- as.numeric(vol_by_grid$total_vol_in_cell) #convert volume col to numeric
+
+saveRDS(vol_by_grid,"vol_by_grid.rds")
+vol_by_grid <- readRDS("vol_by_grid.rds")
+
+```
+
+###Map
+```{r}
+
+ggplot() +
+    geom_sf(data = vol_by_grid, aes(fill = total_vol_in_cell), color = NA) +
+    #geom_sf(data = damCapacity2, col = "blue") +
+    scale_fill_gradient2(low = "gray70", high = "#078FF7") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Volume per ", km^2))) + 
+    theme_minimal() 
+```
+##Compare original volumes to new volumes
+
+```{r}
+summary(vol_by_grid$total_vol_in_cell)
+sum(vol_by_grid$total_vol_in_cell,na.rm=T)
+vol_by_grid %>% arrange(desc(total_vol_in_cell))
+
+```
+
+#Import data
+##Dam volumes
+```{r}
+vol_by_grid <- readRDS("vol_by_grid.rds")
+
+#volumes
+rvol <- vol_by_grid
+
+#make it a raster
+rvol <- rast(ncols = 174, nrows = 63, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
+rvol
+values(rvol) <- vol_by_grid$total_vol_in_cell 
+plot(rvol,1, colNA="grey70") #hmm upside down
+rvol  <- flip(rvol, direction="vertical")
+plot(rvol,1, colNA="grey70")
+```
+##Lis inputs 
+```{r}
+#lis inputs
+inputs <- nc_open("lis_input.nc")
+print(inputs)
+
+attributes(inputs$var)
+attributes(inputs$dim)
+
+```
+
+##Organize Inputs data 
+```{r}
+# Get latitude and longitude with the ncvar_get function and store each into their own object:
+lat <- ncvar_get(inputs, "lat")
+nlat <- dim(lat) #to check it matches the metadata: 63
+lon <- ncvar_get(inputs, "lon")
+nlon <- dim(lon) #to check, should be 174
+# Check your lat lon dimensions match the information in the metadata we explored before:
+print(c(nlon, nlat))
+
+#interesting they do not match. Lat and Lon are both stored as two dimensional data arrays. Let's select just the unique lats and longs from those arrays: 
+lat <- lat[1,]
+lon <- lon[,1]
+
+#now pull an array, just to check
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+dim(HYMAP_grid_area) #to check; this should give you 174 and 63
+```
+
+#Dam volumes
+```{r}
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
+HYMAP_river_width <- ncvar_get(inputs, "HYMAP_river_width")
+HYMAP_river_length <- ncvar_get(inputs, "HYMAP_river_length")
+HYMAP_river_height <- ncvar_get(inputs, "HYMAP_river_height")
+damvol <- rvol
+
+for (i in 1:length(lon)){
+  for (j in 1:length(lat))
+    damvol = damvol
+    rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j]
+    floodvol = damvol - rivervol
+    area = HYMAP_grid_area[i,j]
+    height = HYMAP_floodplain_height[i,j,]
+    volume = area * height
+    model = lm(volume ~ height)
+    m = coef(model)[2]
+    b = coef(model)[1]
+    floodheight = (floodvol-b)/m
+    values(floodheight)[values(floodheight) < 0] = 0
+    totaldamheights = floodheight + HYMAP_river_height[i,j]
+    #print(floodheight)
+} 
+
+plot(floodheight,1, colNA="grey70")
+plot(totaldamheights,1, colNA="grey70")
+
+
+```

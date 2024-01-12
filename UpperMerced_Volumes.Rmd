@@ -731,6 +731,7 @@ ggplot() +
 ```
 ```{r}
 vol_by_grid5
+summary(vol_by_grid5$total_volume_in_Cell)
 ```
 
 
@@ -1052,9 +1053,9 @@ damvol <- rvol
 for (i in 1:lon){
   for (j in 1:lat)
     damvol = damvol
-    rivervol = HYMAP_river_width[,] * HYMAP_river_length[,] * HYMAP_river_height[,]
-    floodvol = damvol - rivervol
-    area = HYMAP_grid_area[,]
+    rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j]
+    floodvol = damvol - rivervol[i,j]
+    area = HYMAP_grid_area[i,j]
     height = HYMAP_floodplain_height[,,]
     volume = area * height
     model = lm(volume ~ height)
