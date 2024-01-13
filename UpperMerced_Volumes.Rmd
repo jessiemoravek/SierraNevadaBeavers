@@ -557,6 +557,11 @@ summary(vol_by_grid3$total_vol_in_cell,na.rm=T)
 sum(vol_by_grid3$total_vol_in_cell,na.rm=T)
 ```
 
+```{r}
+summary(vol_by_grid3$total_vol_in_cell)
+sum(vol_by_grid3$total_vol_in_cell,na.rm=T)
+vol_by_grid3 %>% arrange(desc(total_vol_in_cell))
+```
 
 
 
@@ -783,7 +788,6 @@ for (i in 1:nrow(area_matrix)){
     print(floodheight)
  }}   
     
-
 ```
 
 

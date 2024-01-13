@@ -1,0 +1,194 @@
+---
+title: "UpperMerced_DamHeights_ForHarshad"
+output: html_document
+date: "2024-01-13"
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(dataRetrieval)
+library(ggsn)
+library(sf)
+library(maps)
+library(sp)
+library(ncdf4)
+library(sf)
+library(sp)
+library(lwgeom)
+library(terra)
+library(raster)
+```
+
+#Import input variables
+##NASA spatial projection -- Note that I have to use this spatial projection here
+```{r}
+wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
+```
+
+##Dam volumes
+```{r}
+#Beaver dam volumes by 1x1km grid across the entire domain, based on BRAT model
+vol_by_grid <- readRDS("vol_by_grid.rds")
+rvol <- vol_by_grid
+#This is currently an sf polygon object. I figured it was easier to work with a raster, so I made it a raster below. 
+
+#Make it a raster
+rvol <- rast(ncols = 174, nrows = 63, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
+rvol
+values(rvol) <- vol_by_grid$total_vol_in_cell 
+plot(rvol,1, colNA="grey70") #hmm upside down
+#the raster is upside down so I flipped it. The final watershed should look like the one mapped below. 
+rvol  <- flip(rvol, direction="vertical")
+plot(rvol,1, colNA="grey70")
+```
+
+##LIS inputs 
+```{r}
+#These are physical river feature inputs from the NASA model. They are in the format of a .netcdf file (.nc). A netcdf file is multidimensional (lat, lon, a bunch of variables) but I can pull a certain variable in the form of an array. 
+
+#For now, here's the netcdf file: 
+inputs <- nc_open("lis_input.nc")
+
+#Look at the variables 
+attributes(inputs$var)
+
+#Look at the dimensions (lat and lon)
+attributes(inputs$dim)
+
+```
+
+##Organize LIS Input data 
+```{r}
+#In this chunk I am wrangling the netcdf file so I can pull a single variable into an array. 
+
+#Get latitude and longitude with the ncvar_get function and store each into their own object:
+lat <- ncvar_get(inputs, "lat")
+nlat <- dim(lat) #to check it matches the metadata: 63
+lon <- ncvar_get(inputs, "lon")
+nlon <- dim(lon) #to check, should be 174
+# Check your lat lon dimensions match the information in the metadata we explored before:
+print(c(nlon, nlat))
+
+#Lat and Lon are both stored as two dimensional data arrays. Let's select just the unique lats and longs from those arrays: 
+lat <- lat[1,]
+lon <- lon[,1]
+
+#now pull a single variable as an array, just to check that this worked
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+dim(HYMAP_grid_area) #to check; this should give you 174 and 63
+
+#Pull elevation for fun just to see what elevation looks like: 
+elevation <- ncvar_get(inputs, "ELEVATION")
+image(lon, lat, elevation)
+summary(elevation)
+```
+
+#Calculate dam volumes
+```{r}
+#The purpose of this code is to use the beaver dam volumes (the rvol raster from above) along with riverbed geometry (river height, width, length, floodplain height) for each grid cell to back-calculate the height a beaver dam would need to be to store the  appropriate volume of water. Then we gotta add that height to elevation to get total elevation of dam above sea level. 
+
+#First, I pull arrays for individual variables from the netcdf file: 
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
+HYMAP_river_width <- ncvar_get(inputs, "HYMAP_river_width")
+HYMAP_river_length <- ncvar_get(inputs, "HYMAP_river_length")
+HYMAP_river_height <- ncvar_get(inputs, "HYMAP_river_height")
+elevation <- ncvar_get(inputs, "ELEVATION")
+
+#Next, I rename my raster just for fun: 
+damvol <- rvol
+
+#Here's the nested for loop that iterates over every latitute and longitude (i.e. every cell in an array)
+
+damheightsasl_array <- array(dim = c(174,63))
+
+for (i in 1:length(lon)){ #iterate over every longitude
+  for (j in 1:length(lat)){ #iterate over every latitude
+    damvol = damvol #make sure we have dam volume variable
+    rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j] #calculate the volume of the river in that particular cell (width*length*height)
+    floodvol = damvol - rivervol #calculate the volume of water left in the floodplain                             
+    area = HYMAP_grid_area[i,j] #pull in area
+    height = HYMAP_floodplain_height[i,j,] #pull in floodplain height, which is a 3 dim variable 
+    volume = area * height #floodplane volume 
+    model = lm(volume ~ height) #make a lm
+    m = coef(model)[2]
+    b = coef(model)[1]
+    floodheight = (floodvol-b)/m #back calculate floodplain height
+    values(floodheight)[values(floodheight) < 0] = 0 #no negative heights
+    damheightsasl_array = floodheight + elevation[i,j] #add to the elevation variable 
+    
+    
+}} 
+
+damheightsasl_array
+plot(damheightsasl_array,1, colNA="grey70")
+#WHY ARE THE VALUES ALL THE SAME!?!?! THey should NOT be the same because elevation varies over this watershed!!!!!!!!!!! Look at the elevation variable-- it varies so fucking much! WHat's going on. 
+
+plot(floodheight,1, colNA="grey70")
+#the floodheight variable is jsut the dam heights, without adding elevation. There are very samll dam heights here. This seems wrong.  
+
+
+
+```
+#Trying this again, but using an array for the dam volumes instead of a raster, so that all data formats inthe loop are the same. 
+##Making rvol a .nc file
+```{r}
+library(RNetCDF)
+
+writeCDF(rvol,"rvol.nc", overwrite=TRUE)
+
+rvolnc <- nc_open("rvol.nc")
+print(rvolnc)
+
+# Get latitude and longitude with the ncvar_get function and store each into their own object:
+  lat <- ncvar_get(rvolnc, "latitude")
+  nlat <- dim(lat) #to check it matches the metadata: 63
+  lon <- ncvar_get(rvolnc, "longitude")
+  nlon <- dim(lon) #to check, should be 174
+  # Check your lat lon dimensions match the information in the metadata we explored before:
+  print(c(nlon, nlat))
+
+attributes(rvolnc$var)
+attributes(rvolnc$dim)
+
+#now pull an array
+total_vol_in_cell <- ncvar_get(rvolnc, "rvol")
+dim(total_vol_in_cell) #to check; this should give you 174 and 63
+```
+
+#For loop again, with dam volumes as an array. 
+```{r}
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
+HYMAP_river_width <- ncvar_get(inputs, "HYMAP_river_width")
+HYMAP_river_length <- ncvar_get(inputs, "HYMAP_river_length")
+HYMAP_river_height <- ncvar_get(inputs, "HYMAP_river_height")
+elevation <- ncvar_get(inputs, "ELEVATION")
+damvol <- ncvar_get(rvolnc, "rvol")
+
+damheightsasl_array_2 <- array(dim = c(174,63))
+
+for (i in 1:length(lon)){
+  for (j in 1:length(lat)){
+    damvol = damvol
+    rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j]
+    floodvol = damvol - rivervol
+    area = HYMAP_grid_area[i,j]
+    height = HYMAP_floodplain_height[i,j,]
+    volume = area * height
+    model = lm(volume ~ height)
+    m = coef(model)[2]
+    b = coef(model)[1]
+    floodheight = (floodvol-b)/m
+    floodheight[floodheight < 0] = 0
+    damheightsasl_array_2[i,j] = floodheight[i,j] + elevation[i,j]
+    
+  }} 
+
+damheightsasl_array_2
+#There should be NO NA values because there should be an elevation everywhere!!! Wtf!???!
+
+```
+

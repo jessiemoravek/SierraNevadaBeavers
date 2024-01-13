@@ -19,6 +19,7 @@ library(sp)
 library(lwgeom)
 library(terra)
 library(raster)
+library(plot.matrix)
 
 ```
 
@@ -134,6 +135,7 @@ summary(vol_by_grid$total_vol_in_cell)
 sum(vol_by_grid$total_vol_in_cell,na.rm=T)
 vol_by_grid %>% arrange(desc(total_vol_in_cell))
 
+#Generally similar to original volumes in an old projection, if not slighlty higher
 ```
 
 #Import data
@@ -152,6 +154,7 @@ plot(rvol,1, colNA="grey70") #hmm upside down
 rvol  <- flip(rvol, direction="vertical")
 plot(rvol,1, colNA="grey70")
 ```
+
 ##Lis inputs 
 ```{r}
 #lis inputs
@@ -180,6 +183,11 @@ lon <- lon[,1]
 #now pull an array, just to check
 HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
 dim(HYMAP_grid_area) #to check; this should give you 174 and 63
+
+
+elevation <- ncvar_get(inputs, "ELEVATION")
+image(lon, lat, elevation)
+summary(elevation)
 ```
 
 #Dam volumes
@@ -189,6 +197,7 @@ HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
 HYMAP_river_width <- ncvar_get(inputs, "HYMAP_river_width")
 HYMAP_river_length <- ncvar_get(inputs, "HYMAP_river_length")
 HYMAP_river_height <- ncvar_get(inputs, "HYMAP_river_height")
+elevation <- ncvar_get(inputs, "ELEVATION")
 damvol <- rvol
 
 for (i in 1:length(lon)){
@@ -204,12 +213,193 @@ for (i in 1:length(lon)){
     b = coef(model)[1]
     floodheight = (floodvol-b)/m
     values(floodheight)[values(floodheight) < 0] = 0
-    totaldamheights = floodheight + HYMAP_river_height[i,j]
+    damheightsasl = floodheight + elevation[i,j]
+    
+    
+    #totaldamheights = floodheight + HYMAP_river_height[i,j]
     #print(floodheight)
 } 
 
 plot(floodheight,1, colNA="grey70")
-plot(totaldamheights,1, colNA="grey70")
+#plot(totaldamheights,1, colNA="grey70")
+plot(damheightsasl,1, colNA="grey70")
+
+#Attempting to add elevation highlights a weird problem-- it adds the SAME elevation to every cell. Why? When looking at the elevation nc slice, elevation differs by cell, as it should. But in this for loop, something goes wrong and elevation is the same in every cell. 
+#Maybe this is going wrong because damvol is a raster, and all the other values are arrays (derived from slices of nc files?)
+```
+
+#Making rvol a .nc file
+```{r}
+library(RNetCDF)
+
+writeCDF(rvol,"rvol.nc", overwrite=TRUE)
+
+rvolnc <- nc_open("rvol.nc")
+print(rvolnc)
+
+# Get latitude and longitude with the ncvar_get function and store each into their own object:
+  lat <- ncvar_get(rvolnc, "latitude")
+  nlat <- dim(lat) #to check it matches the metadata: 63
+  lon <- ncvar_get(rvolnc, "longitude")
+  nlon <- dim(lon) #to check, should be 174
+  # Check your lat lon dimensions match the information in the metadata we explored before:
+  print(c(nlon, nlat))
+
+attributes(rvolnc$var)
+attributes(rvolnc$dim)
+
+#now pull an array
+total_vol_in_cell <- ncvar_get(rvolnc, "rvol")
+dim(total_vol_in_cell) #to check; this should give you 174 and 63
 
 
 ```
+
+
+```{r}
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
+HYMAP_river_width <- ncvar_get(inputs, "HYMAP_river_width")
+HYMAP_river_length <- ncvar_get(inputs, "HYMAP_river_length")
+HYMAP_river_height <- ncvar_get(inputs, "HYMAP_river_height")
+elevation <- ncvar_get(inputs, "ELEVATION")
+damvol <- ncvar_get(rvolnc, "rvol")
+
+damheightsasl_array <- array(dim = c(174,63))
+for (i in 1:length(lon)){
+  for (j in 1:length(lat)){
+    damvol = damvol
+    rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j]
+    floodvol = damvol - rivervol
+    area = HYMAP_grid_area[i,j]
+    height = HYMAP_floodplain_height[i,j,]
+    volume = area * height
+    model = lm(volume ~ height)
+    m = coef(model)[2]
+    b = coef(model)[1]
+    floodheight = (floodvol-b)/m
+    floodheight[floodheight < 0] = 0
+    damheightsasl_array[i,j] = floodheight + elevation[i,j]
+    #damheightsasl_array = damheightsasl[i,j]
+ 
+    #totaldamheights = floodheight + HYMAP_river_height[i,j]
+    #print(floodheight)
+  }} 
+
+damheightsasl_array
+```
+
+#Turn damheightsasl_array into a raster to make it plotable
+```{r}
+#make it a raster
+damheightsasl_r <- rast(ncols = 174, nrows = 63, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
+damheightsasl_r
+
+values(damheightsasl_r) <- t(damheightsasl_array)
+
+plot(damheightsasl_r,1, colNA="grey70") #hmm upside down
+damheightsasl_r  <- flip(damheightsasl_r, direction="vertical")
+plot(damheightsasl_r,1, colNA="grey70")
+```
+
+#Turn elevation into a raster to make it plotable
+```{r}
+#make it a raster
+elevation_r <- rast(ncols = 174, nrows = 63, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
+elevation_r
+
+values(elevation_r) <- t(elevation)
+
+plot(elevation_r,1, colNA="grey70") #hmm upside down
+elevation_r  <- flip(elevation_r, direction="vertical")
+plot(elevation_r,1, colNA="grey70")
+```
+#Huh...maybe damheights and elevation are the same? Need to double check
+##Run for JUSt dam heights (sans elevation)
+
+```{r}
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
+HYMAP_river_width <- ncvar_get(inputs, "HYMAP_river_width")
+HYMAP_river_length <- ncvar_get(inputs, "HYMAP_river_length")
+HYMAP_river_height <- ncvar_get(inputs, "HYMAP_river_height")
+elevation <- ncvar_get(inputs, "ELEVATION")
+damvol <- ncvar_get(rvolnc, "rvol")
+
+damheights_array <- array(dim = c(174,63))
+for (i in 1:length(lon)){
+  for (j in 1:length(lat)){
+    damvol = damvol
+    rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j]
+    floodvol = damvol - rivervol
+    area = HYMAP_grid_area[i,j]
+    height = HYMAP_floodplain_height[i,j,]
+    volume = area * height
+    model = lm(volume ~ height)
+    m = coef(model)[2]
+    b = coef(model)[1]
+    floodheight = (floodvol-b)/m
+    floodheight[floodheight < 0] = 0
+    damheights_array[i,j] = floodheight[i,j] 
+    #damheightsasl_array = damheightsasl[i,j]
+ 
+    #totaldamheights = floodheight + HYMAP_river_height[i,j]
+    #print(floodheight)
+  }} 
+
+damheights_array
+max(damheights_array)
+#Huh??? these are way too small. Does the dam heights variable change whether you do it by raster or by nc????
+```
+
+##Try with raster for the damvol variable
+```{r}
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
+HYMAP_river_width <- ncvar_get(inputs, "HYMAP_river_width")
+HYMAP_river_length <- ncvar_get(inputs, "HYMAP_river_length")
+HYMAP_river_height <- ncvar_get(inputs, "HYMAP_river_height")
+elevation <- ncvar_get(inputs, "ELEVATION")
+damvol <- rvol
+
+damheights_array <- array(dim = c(174,63))
+for (i in 1:length(lon)){
+  for (j in 1:length(lat)){
+    damvol = damvol
+    rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j]
+    floodvol = damvol - rivervol
+    area = HYMAP_grid_area[i,j]
+    height = HYMAP_floodplain_height[i,j,]
+    volume = area * height
+    model = lm(volume ~ height)
+    m = coef(model)[2]
+    b = coef(model)[1]
+    floodheight = (floodvol-b)/m
+    floodheight[floodheight < 0] = 0
+    damheights_array= floodheight 
+    #damheightsasl_array = damheightsasl[i,j]
+ 
+    #totaldamheights = floodheight + HYMAP_river_height[i,j]
+    #print(floodheight)
+  }} 
+
+damheights_array
+#okay that makes more sense...but why are the values different?
+```
+#F this. Would apply work better???
+
+```{r}
+sFunc <- function(x, y){
+  if(is.na(x)){
+    return(ds2[ds2[,"colA"] == y, "colB"])
+  } else {
+    return(x)
+  }
+}
+
+mapply(sFunc, ds1$col1, ds1$col2)
+
+
+mapply()
+```
+
