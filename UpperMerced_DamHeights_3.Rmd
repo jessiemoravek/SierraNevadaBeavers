@@ -1,9 +1,9 @@
-#---
-#title: "UpperMerced_DamHeights_ForHarshad"
-#$output: html_document
-#date: "2024-01-13"
 ---
-  
+title: "UpperMerced_DamHeights_3"
+output: html_document
+date: "2024-01-23"
+---
+```{r}
 library(tidyverse)
 library(ggplot2)
 library(dplyr)
@@ -19,18 +19,117 @@ library(lwgeom)
 library(terra)
 library(raster)
 library(mapview)
+```
 
-#funky projection
-wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],
-          AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,
-            AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
+##NASA projection
+```{r}
+wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
+```
 
-#Beaver dam volumes by 1x1km grid across the entire domain, based on BRAT model
+
+##Dam Capacity
+```{r}
+# Read in the shapefile with st_read()
+#damCapacity2 <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity2.shp")
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "damCapacity2*",recursive = F))
+
+# Read in shapefile from previously imported shapefile
+damCapacity2 <- readRDS("damCapacity2")
+
+#Project to wkt (NASA projection)
+damCapacity2 <- st_transform(damCapacity2, wkt)
+saveRDS(damCapacity2,"damCapacity2")
+```
+
+##Make a grid
+```{r}
+#Make a bounding box extent
+xmin <- -120.985
+xmax <- -119.255
+ymin <- 37.325
+ymax <- 37.925
+extent <- extent(xmin, xmax, ymin, ymax)
+
+#Make a bounding box in the correct projection
+study_area <- st_bbox(extent, crs = st_crs(wkt))
+
+#Is wkt in metric or lat/long coordinate system? st_is_longlat gives TRUE, so it is NOT in metric.
+st_is_longlat(study_area)
+
+#Make a grid of the correct size
+study_area = st_make_grid(study_area, n = c(174,63))
+
+#Convert to an sf dataframe for future manipulation
+study_area = st_as_sf(study_area)
+
+#Add an ID column
+study_area$id = 1:nrow(study_area)
+```
+
+##Volume calculation
+```{r}
+damCapacity2_v <- damCapacity2
+for (i in damCapacity2_v){ #for each stream segment in the BRAT model output shapefile
+  damCt <- damCapacity2_v$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_EX_CT in the attribute table)
+  slope <- damCapacity2_v$iGeo_Slope #meters
+  da <- damCapacity2_v$iGeo_DA #m2
+  width <- ifelse(da < 4.95,2.18*(da)^0.191,
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
+  height <- 1 #assume all beaver dams are 1m tall
+  length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
+  maxLength<- (damCapacity2_v$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
+  volume <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt))
+  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damCt),(width)*(maxLength)*(damCt))
+  damCapacity2_v$width <- width
+  damCapacity2_v$volume <- volume #m3
+  damCapacity2_v$surfaceArea <- surfaceArea #m2
+} 
+
+
+saveRDS(damCapacity2_v,"damCapacity2_v.rds")
+```
+
+##Volume by grid cell
+```{r}
+sf_use_s2(FALSE)
+intersection <- st_intersection(study_area, damCapacity2_v) %>% 
+  mutate(length = st_length(.)) %>% #creates a "length" column that is the length of that particular segment in the grid cell from the "id" column
+  st_drop_geometry() # complicates things in joins later on
+
+study_area <- study_area %>% 
+  left_join(intersection, by = "id")
+
+vol_by_grid <- study_area %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_vol_in_cell = percent_len_in_cell*volume) %>% 
+  group_by(id) %>% summarize(total_vol_in_cell = sum(segment_vol_in_cell))
+
+vol_by_grid$total_vol_in_cell <- as.numeric(vol_by_grid$total_vol_in_cell) #convert volume col to numeric
+
+saveRDS(vol_by_grid,"vol_by_grid.rds")
 vol_by_grid <- readRDS("vol_by_grid.rds")
-rvol <- vol_by_grid
-mapview(rvol)
 
-#Make it a raster
+```
+
+###Map
+```{r}
+
+ggplot() +
+    geom_sf(data = vol_by_grid, aes(fill = total_vol_in_cell), color = NA) +
+    #geom_sf(data = damCapacity2, col = "blue") +
+    scale_fill_gradient2(low = "gray70", high = "#078FF7") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle( expression(paste("Volume per ", km^2))) + 
+    theme_minimal() 
+```
+
+#Import data
+##Dam volumes
+```{r}
+vol_by_grid <- readRDS("vol_by_grid.rds")
 rvol <- rast(ncols = 174, nrows = 63, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
 rvol
 values(rvol) <- vol_by_grid$total_vol_in_cell 
@@ -41,17 +140,18 @@ rvol  <- flip(rvol, direction="vertical")
 plot(rvol,1, colNA="grey70")
 mapview(raster(rvol))
 
-#For now, here's the netcdf file: 
+```
+
+##Lis inputs 
+```{r}
+#lis inputs
 inputs <- nc_open("lis_input.nc")
-print(inputs)
-#Look at the variables 
-attributes(inputs$var)
 
-#Look at the dimensions (lat and lon)
-attributes(inputs$dim)
 
-#In this chunk I am wrangling the netcdf file so I can pull a single variable into an array. 
+```
 
+##Pre-process LIS inputs so they make sense
+```{r}
 #Get latitude and longitude with the ncvar_get function and store each into their own object:
 lat <- ncvar_get(inputs, "lat")
 nlat <- dim(lat) #to check it matches the metadata: 63
@@ -72,14 +172,11 @@ elevation <- ncvar_get(inputs, "ELEVATION")
 image(lon, lat, elevation)
 summary(elevation)
 
-HYMAP_river_height <- ncvar_get(inputs, "HYMAP_river_height")
-image(lon,lat,HYMAP_river_height)
+```
 
-
-#The purpose of this code is to use the beaver dam volumes (the rvol raster from above) 
-#along with riverbed geometry (river height, width, length, floodplain height) for each grid cell to 
-#back-calculate the height a beaver dam would need to be to store the  appropriate volume of water. 
-#Then we gotta add that height to elevation to get total elevation of dam above sea level. 
+##Pre-process all input matrices
+```{r}
+#The purpose of this code is to use the beaver dam volumes (the rvol raster from above) along with riverbed geometry (river height, width, length, floodplain height) for each grid cell to back-calculate the height a beaver dam would need to be to store the  appropriate volume of water. Then we gotta add that height to elevation to get total elevation of dam above sea level. 
 
 #First, I pull arrays for individual variables from the netcdf file: 
 HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
@@ -93,20 +190,22 @@ elevation <- ncvar_get(inputs, "ELEVATION")
 
 #Next, I rename my raster just for fun: 
 damvol <- rvol
-mapview(raster(rvol))
-damvol.df <- as.matrix(t(raster(damvol)), xy=T) #Converted your raster to a matrix. Using the raster as-is is problematic as
-#it uses the whole thing for every iteration of the loop instead of the specific cell you're interested in
+damvol.df <- as.matrix(t(raster(damvol)), xy=T) #Converted your raster to a matrix. Using the raster as-is is problematic as it uses the whole thing for every iteration of the loop instead of the specific cell you're interested in
 dim(damvol.df)
 str(damvol.df)
-damvol.df
+```
 
-
+##Making empty arrays to look at output
+```{r}
 damheightsasl_array <- matrix(NA_real_, 174, 63) #Using a matrix seems easier than an array for some reason
 floodheight_array <- matrix(NA_real_, 174, 63)
 floodvol_array <- matrix(NA_real_, 174, 63)
 rivervol_array <- matrix(NA_real_, 174, 63)
+```
 
 
+##For Loop
+```{r}
 for (i in 1:length(lon)){ #iterate over every longitude
   for (j in 1:length(lat)){ #iterate over every latitude
     damvol_val = damvol.df[i,j] #Using the matrix instead of the raster in your original code
@@ -126,9 +225,11 @@ for (i in 1:length(lon)){ #iterate over every longitude
     rivervol_array[i,j] = rivervol
     
  }} 
+```
 
 
-
+##Viewing all the outputs
+```{r}
 damheightsasl_array <- t(damheightsasl_array) #Fixing the flipping and rotation issue
 damheight <- rast(damheightsasl_array)
 e <- extent(c(-120.985, -119.255, 37.325, 37.925))
@@ -188,5 +289,37 @@ extent(HYMAP_river_height_r) <- e
 crs(HYMAP_river_height_r) <- wkt
 mapview(HYMAP_river_height_r)
 
+```
 
 
+#make NetCDF file
+```{r}
+
+damheight_spatrast <- rast(damheight)
+writeCDF(damheight_spatrast,"damheight_elevation_4.nc",overwrite=TRUE)
+
+
+```
+
+#only need to run this once
+damheight <- rast(damheight)
+
+writeCDF(damheight,"damheight_elevation_3.nc",overwrite=TRUE)
+
+damheight_elevation_3 <- nc_open("damheight_elevation_3.nc")
+attributes(damheight_elevation_3$var)
+attributes(damheight_elevation_3$dim)
+
+lat <- ncvar_get(damheight_elevation_3, "latitude")
+nlat <- dim(lat) #to check it matches the metadata: 63
+lon <- ncvar_get(damheight_elevation_3, "longitude")
+nlon <- dim(lon) #to check, should be 174
+# Check your lat lon dimensions match the information in the metadata we explored before:
+print(c(nlon, nlat))
+
+lat <- rev(lat)
+
+damheight_elevation_test <- ncvar_get(damheight_elevation_3, 'damheight_elevation_3')
+
+image(lon, lat, damheight_elevation_test)
+#ok but remember I made up upside down with rev(lat) so this shoudl be correct
