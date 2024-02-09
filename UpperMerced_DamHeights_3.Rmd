@@ -145,7 +145,7 @@ mapview(raster(rvol))
 ##Lis inputs 
 ```{r}
 #lis inputs
-inputs <- nc_open("lis_input.nc")
+inputs <- nc_open("lis_input_berkeley.nc")
 
 
 ```
@@ -184,16 +184,44 @@ HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
 HYMAP_river_width <- ncvar_get(inputs, "HYMAP_river_width")
 HYMAP_river_length <- ncvar_get(inputs, "HYMAP_river_length")
 HYMAP_river_height <- ncvar_get(inputs, "HYMAP_river_height")
-elevation <- ncvar_get(inputs, "ELEVATION")
+elevation <- ncvar_get(inputs, "HYMAP_grid_elevation")
 
 
+#Try transposing them:
+str(elevation)
+dim(elevation)
+dim(HYMAP_river_height)
+
+HYMAP_grid_area_t <- t(HYMAP_grid_area)
+HYMAP_floodplain_height_t <- aperm(HYMAP_floodplain_height, c(2,1,3)) #can't transpose this variable bc it's a 3d matrix
+dim(HYMAP_floodplain_height_t)
+HYMAP_river_width_t <- t(HYMAP_river_width)
+dim(HYMAP_river_width_t)
+HYMAP_river_length_t <- t(HYMAP_river_length)
+HYMAP_river_height_t <- t(HYMAP_river_height)
+elevation_t <- t(elevation)
 
 #Next, I rename my raster just for fun: 
 damvol <- rvol
 damvol.df <- as.matrix(t(raster(damvol)), xy=T) #Converted your raster to a matrix. Using the raster as-is is problematic as it uses the whole thing for every iteration of the loop instead of the specific cell you're interested in
-dim(damvol.df)
-str(damvol.df)
+damvol.dft <- t(damvol.df)
+dim(damvol.dft)
+str(damvol.dft)
 ```
+#Figure out how to transpose a 3d matrix
+```{r}
+
+# Create a small 2x3x4 array
+height_array <- array(cumsum(abs(rnorm(24))), dim = c(5, 7, 10))
+
+# Print the array
+print(height_array)
+t(height_array)
+heightarray2 <- aperm(height_array, c(2,1,3))
+print(heightarray2)
+
+```
+
 
 ##Making empty arrays to look at output
 ```{r}
@@ -208,7 +236,7 @@ rivervol_array <- matrix(NA_real_, 174, 63)
 ```{r}
 for (i in 1:length(lon)){ #iterate over every longitude
   for (j in 1:length(lat)){ #iterate over every latitude
-    damvol_val = damvol.df[i,j] #Using the matrix instead of the raster in your original code
+    damvol_val = damvol.dft[i,j] #Using the matrix instead of the raster in your original code
     rivervol = HYMAP_river_width[i,j] * HYMAP_river_length[i,j] * HYMAP_river_height[i,j] #calculate the volume of the river in that particular cell (width*length*height)
     floodvol = damvol_val + rivervol #calculate the volume of water left in the floodplain                             
     area = HYMAP_grid_area[i,j] #pull in area
@@ -289,14 +317,164 @@ extent(HYMAP_river_height_r) <- e
 crs(HYMAP_river_height_r) <- wkt
 mapview(HYMAP_river_height_r)
 
+elevation_r <- rast(t(elevation))
+e <- extent(c(-120.985, -119.255, 37.325, 37.925))
+elevation_r <- raster(flip(elevation_r, direction = 'vertical')) #Because I was lazy and didn't want to find out the equivalent for doing this with a spatraster :P
+extent(elevation_r) <- e
+crs(elevation_r) <- wkt
+mapview(elevation_r)
+
 ```
 
+
+```{r}
+elevation[1,2] #this is 20m asl
+floodheight_array[1,2] #this should NOT be NA
+damheightsasl_array[1,2] #this should also NOT be NA 
+#The mapviewer shows Floodheight_array to be 0.005 at [1,2]
+#The mapviewer shows damheightsasl_array to be 30 at [1,2]
+
+#Both sitautions are wrong. There should NOT be NAs at [1,2]. Also, there total damheights should be 20.005, not 30. What the fuck? 
+
+floodheight_array[61,3]
+elevation[61,4]
+damheightsasl_array[61,4]
+
+```
+
+#Trying it transposed
+##Making empty arrays to look at output
+##Pre-process all input matrices
+```{r}
+#The purpose of this code is to use the beaver dam volumes (the rvol raster from above) along with riverbed geometry (river height, width, length, floodplain height) for each grid cell to back-calculate the height a beaver dam would need to be to store the  appropriate volume of water. Then we gotta add that height to elevation to get total elevation of dam above sea level. 
+
+#First, I pull arrays for individual variables from the netcdf file: 
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
+HYMAP_river_width <- ncvar_get(inputs, "HYMAP_river_width")
+HYMAP_river_length <- ncvar_get(inputs, "HYMAP_river_length")
+HYMAP_river_height <- ncvar_get(inputs, "HYMAP_river_height")
+elevation <- ncvar_get(inputs, "HYMAP_grid_elevation")
+
+
+#Try transposing them:
+str(elevation)
+dim(elevation)
+dim(HYMAP_river_height)
+
+HYMAP_grid_area_t <- t(HYMAP_grid_area)
+HYMAP_floodplain_height_t <- aperm(HYMAP_floodplain_height, c(2,1,3)) #can't transpose this variable bc it's a 3d matrix
+dim(HYMAP_floodplain_height_t)
+HYMAP_river_width_t <- t(HYMAP_river_width)
+dim(HYMAP_river_width_t)
+HYMAP_river_length_t <- t(HYMAP_river_length)
+HYMAP_river_height_t <- t(HYMAP_river_height)
+elevation_t <- t(elevation)
+
+#Next, I rename my raster just for fun: 
+damvol <- rvol
+damvol.df <- as.matrix(t(raster(damvol)), xy=T) #Converted your raster to a matrix. Using the raster as-is is problematic as it uses the whole thing for every iteration of the loop instead of the specific cell you're interested in
+damvol.dft <- t(damvol.df)
+dim(damvol.dft)
+str(damvol.dft)
+```
+```{r}
+damheightsasl_array_t <- matrix(NA_real_, 63, 174) #Using a matrix seems easier than an array for some reason
+floodheight_array_t <- matrix(NA_real_, 63, 174)
+floodvol_array_t <- matrix(NA_real_, 63, 174)
+rivervol_array_t <- matrix(NA_real_, 63, 174)
+```
+
+
+##For Loop
+```{r}
+for (i in 1:length(lat)){ #iterate over every longitude
+  for (j in 1:length(lon)){ #iterate over every latitude
+    damvol_val = damvol.dft[i,j] #Using the matrix instead of the raster in your original code
+    rivervol = HYMAP_river_width_t[i,j] * HYMAP_river_length_t[i,j] * HYMAP_river_height_t[i,j] #calculate the volume of the river in that particular cell (width*length*height)
+    floodvol = damvol_val + rivervol #calculate the volume of water left in the floodplain                             
+    area = HYMAP_grid_area_t[i,j] #pull in area
+    height = HYMAP_floodplain_height_t[i,j,] #pull in floodplain height, which is a 3 dim variable 
+    volume = area * height #floodplane volume 
+    model = lm(volume ~ height) #make a lm
+    m = coef(model)[2]
+    b = coef(model)[1]
+    floodheight = (floodvol-b)/m #back calculate floodplain height
+    floodheight[floodheight<0] = 0
+    damheightsasl_array_t[i,j] = floodheight + elevation_t[i,j] #add to the elevation variable 
+    floodheight_array_t[i,j] = floodheight
+    floodvol_array_t[i,j] = floodvol
+    rivervol_array_t[i,j] = rivervol
+    
+ }} 
+```
+
+##Viewing all the outputs
+```{r}
+damheight_t <- rast(damheightsasl_array_t)
+e <- extent(c(-120.985, -119.255, 37.325, 37.925))
+damheight_t <- raster(damheight_t) #Because I was lazy and didn't want to find out the equivalent for doing this with a spatraster :P
+extent(damheight_t) <- e
+crs(damheight_t) <- wkt
+mapview(damheight_t)
+
+
+floodheight_r <- rast(floodheight_array_t)
+e <- extent(c(-120.985, -119.255, 37.325, 37.925))
+floodheight_r <- raster(floodheight_r) #Because I was lazy and didn't want to find out the equivalent for doing this with a spatraster :P
+extent(floodheight_r) <- e
+crs(floodheight_r) <- wkt
+mapview(floodheight_r)
+
+
+elevation_r <- rast((elevation_t))
+e <- extent(c(-120.985, -119.255, 37.325, 37.925))
+elevation_r <- raster(flip(elevation_r, direction = 'vertical')) #Because I was lazy and didn't want to find out the equivalent for doing this with a spatraster :P
+extent(elevation_r) <- e
+crs(elevation_r) <- wkt
+mapview(elevation_r)
+
+```
+```{r}
+elevation_t[2,3] #this is 20m asl
+floodheight_array_t[2,3] #this should NOT be NA
+damheightsasl_array_t[1,2] #this should also NOT be NA 
+#The mapviewer shows Floodheight_array to be 0.005 at [1,2]
+#The mapviewer shows damheightsasl_array to be 30 at [1,2]
+
+#Both sitautions are wrong. There should NOT be NAs at [1,2]. Also, there total damheights should be 20.005, not 30. What the fuck? 
+
+floodheight_array_t[60,6]
+elevation_t[60,6]
+damheightsasl_array_t[60,6]
+#That's correct now
+
+#Okay now we have flipped things
+
+elevation_t[2,3] #this is 16 asl
+floodheight_array_t[2,3] #this should NOT be NA
+damheightsasl_array_t[1,2] #this should also NOT be NA 
+
+
+floodheight_array_t[60,6]
+elevation_t[60,6]
+damheightsasl_array_t[60,6]
+#That's correct now
+#But the issue is that it's indexed upside down for Python
+
+```
+
+#Save as raster
+```{r}
+damheight_spatrast <- rast(damheight_t)
+writeRaster(damheight_spatrast,"damheight_spatrast.tif", overwrite=FALSE)
+```
 
 #make NetCDF file
 ```{r}
 
-damheight_spatrast <- rast(damheight)
-writeCDF(damheight_spatrast,"damheight_elevation_4.nc",overwrite=TRUE)
+damheight_spatrast <- rast(damheight_t)
+writeCDF(damheight_spatrast,"damheight_elevation_6.nc",overwrite=TRUE)
 
 
 ```
