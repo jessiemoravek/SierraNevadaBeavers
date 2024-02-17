@@ -336,7 +336,7 @@ damheightsasl_array[1,2] #this should also NOT be NA
 
 #Both sitautions are wrong. There should NOT be NAs at [1,2]. Also, there total damheights should be 20.005, not 30. What the fuck? 
 
-floodheight_array[61,3]
+floodheight_array[61,4]
 elevation[61,4]
 damheightsasl_array[61,4]
 
