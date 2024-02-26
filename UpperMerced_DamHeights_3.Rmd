@@ -216,7 +216,7 @@ height_array <- array(cumsum(abs(rnorm(24))), dim = c(5, 7, 10))
 
 # Print the array
 print(height_array)
-t(height_array)
+#t(height_array)
 heightarray2 <- aperm(height_array, c(2,1,3))
 print(heightarray2)
 
@@ -478,6 +478,13 @@ writeCDF(damheight_spatrast,"damheight_elevation_6.nc",overwrite=TRUE)
 
 
 ```
+
+#floodheight for Augusto 
+```{r}
+floodheight_spatrast <- rast(floodheight_array_t)
+writeCDF(floodheight_spatrast,"floodheight_elevation_6.nc",overwrite=TRUE)
+```
+
 
 #only need to run this once
 damheight <- rast(damheight)
