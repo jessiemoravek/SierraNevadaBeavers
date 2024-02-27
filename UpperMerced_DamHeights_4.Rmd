@@ -188,7 +188,7 @@ elevation_t <- t(elevation)
 
 #Next, I rename my raster just for fun: 
 damvol <- rvol
-damvol.df <- as.matrix(t(damvol), wide=T) #Converted your raster to a matrix. Using the raster as-is is problematic as it uses the whole thing for every iteration of the loop instead of the specific cell you're interested in
+damvol.df <- as.matrix(t(raster(damvol)), xy=T) #Converted your raster to a matrix. Using the raster as-is is problematic as it uses the whole thing for every iteration of the loop instead of the specific cell you're interested in
 damvol.dft <- t(damvol.df)
 dim(damvol.dft)
 str(damvol.dft)
@@ -280,19 +280,10 @@ damheightsasl_array_t[60,6]
 
 ```
 
-#Save as raster
-```{r}
-damheight_spatrast <- rast(damheight_t)
-writeRaster(damheight_spatrast,"damheight_spatrast.tif", overwrite=FALSE)
-```
-
 #make NetCDF file
 ```{r}
-
 damheight_spatrast <- rast(damheight_t)
 writeCDF(damheight_spatrast,"damheight_elevation_6.nc",overwrite=TRUE)
-
-
 ```
 
 #floodheight for Augusto 
