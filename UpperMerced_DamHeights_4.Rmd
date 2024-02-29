@@ -8,7 +8,6 @@ library(tidyverse)
 library(ggplot2)
 library(dplyr)
 library(dataRetrieval)
-library(ggsn)
 library(sf)
 library(maps)
 library(sp)
@@ -22,6 +21,8 @@ library(mapview)
 library(tidyterra)
 library(viridis)
 library(MetBrewer)
+library(stars)
+library(data.table)
 ```
 #ALL STREAMS
 ##Prep Work
@@ -34,10 +35,10 @@ wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563
 ###Dam Capacity
 ```{r}
 # Read in the shapefile with st_read()
-#damCapacity2 <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity2.shp")
+damCapacity2 <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/SierraNevadaBeavers/NoLimits_Clip.shp")
 
 #remove unneeded shapefiles
-#file.remove(list.files(pattern = "damCapacity2*",recursive = F))
+file.remove(list.files(pattern = "damCapacity2*",recursive = F))
 
 # Read in shapefile from previously imported shapefile
 damCapacity2 <- readRDS("damCapacity2")
@@ -57,6 +58,22 @@ ggplot(transform(damCapacity2, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40
     xlab(NULL)+
     ylab(NULL)+
     ggtitle(expression(paste("Upper Merced Dam Capacity (Dams/km)"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+
+```
+####Map
+```{r}
+palette_discrete <- colorRampPalette(colors = c("#E41A1C", "#CCCCCC", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#0070FF"))(7)
+#scales::show_col(palette_new)
+
+ggplot() +
+    geom_sf(data = damCapacity2,aes(color = oPBRC_UD)) +
+    scale_color_manual(values=palette_discrete)+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Restoration Limitations"))) + 
     theme_minimal() +
     theme(plot.title = element_text(hjust = 0.5),
           plot.subtitle = element_text(hjust = 0.5)) 
@@ -132,6 +149,12 @@ saveRDS(vol_by_grid,"vol_by_grid.rds")
 vol_by_grid <- readRDS("vol_by_grid.rds")
 
 ```
+###Summary
+```{r}
+summary(vol_by_grid)
+sum(vol_by_grid$total_vol_in_cell, na.rm=T)
+```
+
 ####Map
 ```{r}
 ggplot() +
@@ -145,7 +168,6 @@ ggplot() +
     theme(plot.title = element_text(hjust=0.5)) +
     coord_sf()
 
-st_crs(vol_by_grid)
 ```
 
 
@@ -160,15 +182,6 @@ plot(rvol,1, colNA="grey70") #hmm upside down
 #the raster is upside down so I flipped it. The final watershed should look like the one mapped below. 
 rvol  <- flip(rvol, direction="vertical")
 plot(rvol,1, colNA="grey70", main = "Dam Water Storage (m3)")
-
-
-#Nicer plot
-
-
-
-plot(rvol,1, colNA="grey70", main = "Dam Water Storage (m3)", col = pal)
-
-
 ```
 
 ###Lis inputs 
@@ -191,9 +204,6 @@ print(c(nlon, nlat))
 #Lat and Lon are both stored as two dimensional data arrays. Let's select just the unique lats and longs from those arrays: 
 lat <- lat[1,]
 lon <- lon[,1]
-
-
-
 ```
 
 ##Transpose inputs
@@ -279,12 +289,12 @@ mapview(elevation_r)
 ```{r}
 ggplot() +
     geom_spatraster(data = floodheight_r, aes(fill = lyr.1)) +
-  scale_fill_viridis(discrete = FALSE, option = "plasma")+
+    scale_fill_viridis(discrete = FALSE, option = "plasma", na.value = "grey70")+
     xlab(NULL)+
     ylab(NULL)+
        theme_minimal()+
     ggtitle(expression(paste("Dam heights (m)"))) + 
-    theme(plot.title = element_text(hjust=0.5)) 
+    theme(plot.title = element_text(hjust=0.5))
 
 ggplot() +
     geom_spatraster(data = floodheight_r, aes(fill = lyr.1)) +
@@ -350,13 +360,13 @@ wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563
 ###Dam Capacity
 ```{r}
 # Read in the shapefile with st_read()
-DamCapNoSlope <- st_read("C:/Users/jessi/Desktop/SierraNevadaBeavers/SierraNevadaBeavers/NoSlopeLim_Clip.shp")
+#DamCapNoSlope <- st_read("C:/Users/jessi/Desktop/SierraNevadaBeavers/SierraNevadaBeavers/NoSlopeLim_Clip.shp")
 
 #remove unneeded shapefiles
-file.remove(list.files(pattern = "DamCapNoSlope*",recursive = F))
+#file.remove(list.files(pattern = "DamCapNoSlope*",recursive = F))
 
 # Read in shapefile from previously imported shapefile
-#DamCapNoSlope <- readRDS("DamCapNoSlope")
+DamCapNoSlope <- readRDS("DamCapNoSlope")
 
 #Project to wkt (NASA projection)
 DamCapNoSlope <- st_transform(DamCapNoSlope, wkt)
@@ -378,16 +388,17 @@ ggplot(transform(DamCapNoSlope, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,4
           plot.subtitle = element_text(hjust = 0.5)) 
 
 ```
+####Map
 ```{r}
-?met.brewer
-met.brewer('Archambault', n = 8)
-
+palette_discrete_2 <- colorRampPalette(colors = c("#CCCCCC", "#4DAF4A", "#984EA3", "#FFFF33", "#0070FF"))(5)
+scales::show_col(palette_discrete)
+scales::show_col(palette_discrete_2)
 ggplot() +
-    geom_sf(data = DamCapNoSlope, aes(color = oPBRC_UD)) +
-    scale_color_manual(values = met.brewer('Archambault', n=8))+
+    geom_sf(data = DamCapNoSlope,aes(color = oPBRC_UD)) +
+    scale_color_manual(values=palette_discrete_2)+
     xlab(NULL)+
     ylab(NULL)+
-    ggtitle(expression(paste("No slope or anthropogenic limitations"))) + 
+    ggtitle(expression(paste("Restoration Limitations"))) + 
     theme_minimal() +
     theme(plot.title = element_text(hjust = 0.5),
           plot.subtitle = element_text(hjust = 0.5)) 
@@ -439,6 +450,11 @@ vol_by_grid_noslope$total_vol_in_cell <- as.numeric(vol_by_grid_noslope$total_vo
 saveRDS(vol_by_grid_noslope,"vol_by_grid_noslope.rds")
 vol_by_grid_noslope <- readRDS("vol_by_grid_noslope.rds")
 
+```
+###Summary
+```{r}
+summary(vol_by_grid_noslope)
+sum(vol_by_grid_noslope$total_vol_in_cell, na.rm=T)
 ```
 ####Map
 ```{r}
