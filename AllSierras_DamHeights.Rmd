@@ -1,0 +1,351 @@
+---
+title: "AllSierras_DamHeights"
+output: html_document
+---
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(dataRetrieval)
+library(sf)
+library(maps)
+library(sp)
+library(ncdf4)
+library(sf)
+library(sp)
+library(lwgeom)
+library(terra)
+library(raster)
+library(mapview)
+library(tidyterra)
+library(viridis)
+library(MetBrewer)
+library(stars)
+library(data.table)
+```
+#ALL STREAMS
+##Prep Work
+###NASA projection
+```{r}
+wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
+```
+
+
+###Dam Capacity
+```{r}
+# Read in the shapefile with st_read()
+#AllSierras_DamCapacity <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/AllSierras_DamCapacity.shp")
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "AllSierras_DamCapacity*",recursive = F))
+
+# Read in shapefile from previously imported shapefile
+AllSierras_DamCapacity <- readRDS("damCapacity2.rds")
+
+#Project to wkt (NASA projection)
+AllSierras_DamCapacity <- st_transform(AllSierras_DamCapacity, wkt)
+saveRDS(AllSierras_DamCapacity,"AllSierras_DamCapacity.rds")
+```
+####Map
+```{r}
+palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
+#scales::show_col(palette_new)
+
+ggplot(transform(AllSierras_DamCapacity, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40), include.lowest=T))) +
+    geom_sf(aes(color = DamCapacity)) +
+    scale_color_manual(values=palette_new)+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Dam Capacity (Dams/km)"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+
+```
+####Map
+```{r}
+palette_discrete <- colorRampPalette(colors = c("#E41A1C", "#CCCCCC", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#0070FF"))(7)
+#scales::show_col(palette_new)
+
+ggplot() +
+    geom_sf(data = AllSierras_DamCapacity,aes(color = oPBRC_UD)) +
+    scale_color_manual(values=palette_discrete)+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Restoration Limitations"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+
+```
+
+###Make a grid
+```{r}
+#Make a bounding box extent
+#longitude	latitude
+#-121.605	34.34
+#-117.305	40.495
+xmin <- -121.605
+xmax <- -117.305
+ymin <- 34.340
+ymax <- 40.495
+extent <- extent(xmin, xmax, ymin, ymax)
+
+#Make a bounding box in the correct projection
+study_area <- st_bbox(extent, crs = st_crs(wkt))
+
+#Is wkt in metric or lat/long coordinate system? st_is_longlat gives TRUE, so it is NOT in metric.
+st_is_longlat(study_area)
+
+#Make a grid of the correct size
+study_area = st_make_grid(study_area, n = c(174,63))
+
+#Convert to an sf dataframe for future manipulation
+study_area = st_as_sf(study_area)
+
+#Add an ID column
+study_area$id = 1:nrow(study_area)
+```
+
+###Volume calculation
+```{r}
+damCapacity2_v <- damCapacity2
+for (i in damCapacity2_v){ #for each stream segment in the BRAT model output shapefile
+  damCt <- damCapacity2_v$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_EX_CT in the attribute table)
+  slope <- damCapacity2_v$iGeo_Slope #meters
+  da <- damCapacity2_v$iGeo_DA #m2
+  width <- ifelse(da < 4.95,2.18*(da)^0.191,
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
+  height <- 1 #assume all beaver dams are 1m tall
+  length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
+  maxLength<- (damCapacity2_v$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
+  volume <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt))
+  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damCt),(width)*(maxLength)*(damCt))
+  damCapacity2_v$width <- width
+  damCapacity2_v$volume <- volume #m3
+  damCapacity2_v$surfaceArea <- surfaceArea #m2
+} 
+
+
+saveRDS(damCapacity2_v,"damCapacity2_v.rds")
+```
+
+###Volume by grid cell
+```{r}
+sf_use_s2(FALSE)
+intersection <- st_intersection(study_area, damCapacity2_v) %>% 
+  mutate(length = st_length(.)) %>% #creates a "length" column that is the length of that particular segment in the grid cell from the "id" column
+  st_drop_geometry() # complicates things in joins later on
+
+study_area <- study_area %>% 
+  left_join(intersection, by = "id")
+
+vol_by_grid <- study_area %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_vol_in_cell = percent_len_in_cell*volume) %>% 
+  group_by(id) %>% summarize(total_vol_in_cell = sum(segment_vol_in_cell))
+
+vol_by_grid$total_vol_in_cell <- as.numeric(vol_by_grid$total_vol_in_cell) #convert volume col to numeric
+
+saveRDS(vol_by_grid,"vol_by_grid.rds")
+vol_by_grid <- readRDS("vol_by_grid.rds")
+
+```
+###Summary
+```{r}
+summary(vol_by_grid)
+sum(vol_by_grid$total_vol_in_cell, na.rm=T)
+```
+
+####Map
+```{r}
+ggplot() +
+    geom_sf(data = vol_by_grid, aes(fill = total_vol_in_cell), color = NA) +
+    #geom_sf(data = damCapacity2, col = "blue") +
+    scale_fill_gradient2(low = "gray70", high = "#078FF7") +
+    xlab(NULL)+
+    ylab(NULL)+
+    theme_minimal()+
+    ggtitle(expression(paste("Dam Volume per ", km^2))) + 
+    theme(plot.title = element_text(hjust=0.5)) +
+    coord_sf()
+
+```
+
+
+##Import data
+###Dam volumes
+```{r}
+vol_by_grid <- readRDS("vol_by_grid.rds")
+rvol <- rast(ncols = 174, nrows = 63, xmin = -120.985, xmax = -119.255, ymin = 37.325, ymax = 37.925)
+rvol
+values(rvol) <- vol_by_grid$total_vol_in_cell 
+plot(rvol,1, colNA="grey70") #hmm upside down
+#the raster is upside down so I flipped it. The final watershed should look like the one mapped below. 
+rvol  <- flip(rvol, direction="vertical")
+plot(rvol,1, colNA="grey70", main = "Dam Water Storage (m3)")
+```
+
+###Lis inputs 
+```{r}
+#lis inputs
+inputs <- nc_open("lis_input_berkeley.nc")
+
+```
+
+###Pre-process LIS inputs so they make sense
+```{r}
+#Get latitude and longitude with the ncvar_get function and store each into their own object:
+lat <- ncvar_get(inputs, "lat")
+nlat <- dim(lat) #to check it matches the metadata: 63
+lon <- ncvar_get(inputs, "lon")
+nlon <- dim(lon) #to check, should be 174
+# Check your lat lon dimensions match the information in the metadata we explored before:
+print(c(nlon, nlat))
+
+#Lat and Lon are both stored as two dimensional data arrays. Let's select just the unique lats and longs from those arrays: 
+lat <- lat[1,]
+lon <- lon[,1]
+```
+
+##Transpose inputs
+```{r}
+#The purpose of this code is to use the beaver dam volumes (the rvol raster from above) along with riverbed geometry (river height, width, length, floodplain height) for each grid cell to back-calculate the height a beaver dam would need to be to store the  appropriate volume of water. Then we gotta add that height to elevation to get total elevation of dam above sea level. 
+
+#First, I pull arrays for individual variables from the netcdf file: 
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
+HYMAP_river_width <- ncvar_get(inputs, "HYMAP_river_width")
+HYMAP_river_length <- ncvar_get(inputs, "HYMAP_river_length")
+HYMAP_river_height <- ncvar_get(inputs, "HYMAP_river_height")
+elevation <- ncvar_get(inputs, "HYMAP_grid_elevation")
+
+#Try transposing them:
+HYMAP_grid_area_t <- t(HYMAP_grid_area)
+HYMAP_floodplain_height_t <- aperm(HYMAP_floodplain_height, c(2,1,3)) #can't transpose this variable bc it's a 3d matrix
+HYMAP_river_width_t <- t(HYMAP_river_width)
+HYMAP_river_length_t <- t(HYMAP_river_length)
+HYMAP_river_height_t <- t(HYMAP_river_height)
+elevation_t <- t(elevation)
+
+#Next, I rename my raster just for fun: 
+damvol <- rvol
+damvol.df <- as.matrix(t(raster(damvol)), xy=T) #Converted your raster to a matrix. Using the raster as-is is problematic as it uses the whole thing for every iteration of the loop instead of the specific cell you're interested in
+damvol.dft <- t(damvol.df)
+dim(damvol.dft)
+str(damvol.dft)
+```
+
+```{r}
+damheightsasl_array_t <- matrix(NA_real_, 63, 174) #Using a matrix seems easier than an array for some reason
+floodheight_array_t <- matrix(NA_real_, 63, 174)
+floodvol_array_t <- matrix(NA_real_, 63, 174)
+rivervol_array_t <- matrix(NA_real_, 63, 174)
+```
+
+
+##For Loop
+```{r}
+for (i in 1:length(lat)){ #iterate over every longitude
+  for (j in 1:length(lon)){ #iterate over every latitude
+    damvol_val = damvol.dft[i,j] #Using the matrix instead of the raster in your original code
+    rivervol = HYMAP_river_width_t[i,j] * HYMAP_river_length_t[i,j] * HYMAP_river_height_t[i,j] #calculate the volume of the river in that particular cell (width*length*height)
+    floodvol = damvol_val + rivervol #calculate the volume of water left in the floodplain                             
+    area = HYMAP_grid_area_t[i,j] #pull in area
+    height = HYMAP_floodplain_height_t[i,j,] #pull in floodplain height, which is a 3 dim variable 
+    volume = area * height #floodplane volume 
+    model = lm(volume ~ height) #make a lm
+    m = coef(model)[2]
+    b = coef(model)[1]
+    floodheight = (floodvol-b)/m #back calculate floodplain height
+    floodheight[floodheight<0] = 0
+    damheightsasl_array_t[i,j] = floodheight + elevation_t[i,j] #add to the elevation variable 
+    floodheight_array_t[i,j] = floodheight
+    floodvol_array_t[i,j] = floodvol
+    rivervol_array_t[i,j] = rivervol
+    
+ }} 
+```
+
+###Viewing all the outputs
+```{r}
+e <- extent(c(-120.985, -119.255, 37.325, 37.925))
+
+damheight_t <- rast(damheightsasl_array_t)
+terra::set.ext(x = damheight_t, value = e)
+terra::set.crs(damheight_t,wkt)
+mapview(damheight_t)
+
+floodheight_r <- rast(floodheight_array_t)
+terra::set.ext(x = floodheight_r, value = e)
+terra::set.crs(floodheight_r,wkt)
+mapview(floodheight_r)
+
+elevation_r <- rast(elevation_t)
+terra::set.ext(x = elevation_r, value = e)
+terra::set.crs(elevation_r,wkt)
+mapview(elevation_r)
+```
+
+####Map
+```{r}
+ggplot() +
+    geom_spatraster(data = floodheight_r, aes(fill = lyr.1)) +
+    scale_fill_viridis(discrete = FALSE, option = "plasma", na.value = "grey70")+
+    xlab(NULL)+
+    ylab(NULL)+
+       theme_minimal()+
+    ggtitle(expression(paste("Dam heights (m)"))) + 
+    theme(plot.title = element_text(hjust=0.5))
+
+ggplot() +
+    geom_spatraster(data = floodheight_r, aes(fill = lyr.1)) +
+    scale_fill_gradient(low='#26A63A', high = '#FFD5E1')+
+    xlab(NULL)+
+    ylab(NULL)+
+       theme_minimal()+
+    ggtitle(expression(paste("Dam heights (m)"))) + 
+    theme(plot.title = element_text(hjust=0.5)) 
+
+```
+
+```{r}
+elevation_t[2,3] #this is 20m asl
+floodheight_array_t[2,3] #this should NOT be NA
+damheightsasl_array_t[1,2] #this should also NOT be NA 
+#The mapviewer shows Floodheight_array to be 0.005 at [1,2]
+#The mapviewer shows damheightsasl_array to be 30 at [1,2]
+
+#Both sitautions are wrong. There should NOT be NAs at [1,2]. Also, there total damheights should be 20.005, not 30. What the fuck? 
+
+floodheight_array_t[60,6]
+elevation_t[60,6]
+damheightsasl_array_t[60,6]
+#That's correct now
+
+#Okay now we have flipped things
+
+elevation_t[2,3] #this is 16 asl
+floodheight_array_t[2,3] #this should NOT be NA
+damheightsasl_array_t[1,2] #this should also NOT be NA 
+
+
+floodheight_array_t[60,6]
+elevation_t[60,6]
+damheightsasl_array_t[60,6]
+#That's correct now
+#But the issue is that it's indexed upside down for Python
+
+```
+
+###make NetCDF file
+```{r}
+damheight_spatrast <- rast(damheight_t)
+writeCDF(damheight_spatrast,"damheight_elevation_6.nc",overwrite=TRUE)
+```
+
+###floodheight for Augusto 
+```{r}
+floodheight_spatrast <- rast(floodheight_array_t)
+writeCDF(floodheight_spatrast,"floodheight_elevation_6.nc",overwrite=TRUE)
+```
