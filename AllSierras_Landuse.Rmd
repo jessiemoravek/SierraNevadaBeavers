@@ -1,0 +1,227 @@
+---
+title: "AllSierras_LandUse"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(dataRetrieval)
+library(sf)
+library(maps)
+library(sp)
+library(ncdf4)
+library(sf)
+library(sp)
+library(lwgeom)
+library(terra)
+library(raster)
+library(mapview)
+library(tidyterra)
+library(viridis)
+library(MetBrewer)
+library(stars)
+library(data.table)
+```
+
+##Prep Work
+###NASA projection
+```{r}
+wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
+
+#California Teal Albers EPSG = 3310
+```
+
+
+###Dam Capacity
+```{r}
+# Read in the shapefile with st_read()
+#AllSierras_DamCapacity <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/AllSierras_DamCapacity.shp")
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "AllSierras_DamCapacity*",recursive = F))
+
+# Read in shapefile from previously imported shapefile
+AllSierras_DamCapacity <- readRDS("AllSierras_DamCapacity.rds")
+
+#Project to Teal Albers
+AllSierras_DamCapacity <- st_transform(AllSierras_DamCapacity, 3310)
+saveRDS(AllSierras_DamCapacity,"AllSierras_DamCapacity.rds")
+```
+
+####Map
+```{r}
+palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
+#scales::show_col(palette_new)
+
+ggplot(transform(AllSierras_DamCapacity, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40), include.lowest=T))) +
+    geom_sf(aes(color = DamCapacity)) +
+    scale_color_manual(values=palette_new)+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Dam Capacity (Dams/km)"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+
+```
+
+###PADUS
+```{r}
+# Read in the shapefile with st_read()
+#PADUS <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/PADUS.shp")
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "PADUS*",recursive = F))
+
+# Read in shapefile from previously imported shapefile
+PADUS <- readRDS("PADUS.rds")
+
+#Project to Teal Albers
+PADUS <- st_transform(PADUS, 3310)
+saveRDS(PADUS,"PADUS.rds")
+```
+
+###WatershedBoundaries
+```{r}
+# Read in the shapefile with st_read()
+#WatershedBoundaries <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/WatershedBoundaries2.shp")
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "WatershedBoundaries*",recursive = F))
+
+# Read in shapefile from previously imported shapefile
+WatershedBoundaries <- readRDS("WatershedBoundaries.rds")
+
+#Project to Teal Albers
+WatershedBoundaries <- st_transform(WatershedBoundaries, 3310)
+saveRDS(WatershedBoundaries,"WatershedBoundaries.rds")
+```
+
+
+###Clip PADUS to watershed boundary area
+```{r}
+#sf_use_s2(FALSE) #only needed if using wkt
+PADUS_clip = st_intersection(PADUS, WatershedBoundaries)
+```
+
+####Map
+```{r}
+palette_discrete <- colorRampPalette(colors = c("#E41A1C", "#CCCCCC", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#0070FF"))(7)
+#scales::show_col(palette_new)
+
+ggplot() +
+    geom_sf(data = PADUS_clip,aes(color = d_GAP_Sts)) +
+    scale_fill_manual(values=palette_discrete)+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Restoration Limitations"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+```
+###Select just GAP 1 and 2
+
+```{r}
+PADUS_Gap12 <- PADUS_clip[PADUS_clip$GAP_Sts==c(1,2),]
+
+```
+
+####Map
+```{r}
+palette_discrete <- colorRampPalette(colors = c("#E41A1C", "#CCCCCC", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#0070FF"))(7)
+#scales::show_col(palette_new)
+
+ggplot() +
+    geom_sf(data = PADUS_Gap12,aes(color = d_GAP_Sts)) +
+    scale_fill_manual(values=palette_discrete)+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Restoration Limitations"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+```
+###Clip BRAT to GAP 1 and 2 area
+```{r}
+DamCap_GAP12 = st_intersection(AllSierras_DamCapacity, PADUS_Gap12)
+
+```
+
+####Map
+```{r}
+palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
+#scales::show_col(palette_new)
+
+ggplot(transform(DamCap_GAP12, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40), include.lowest=T))) +
+    geom_sf(aes(color = DamCapacity)) +
+    scale_color_manual(values=palette_new)+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Dam Capacity (Dams/km)"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+
+```
+
+###Percent Dam Capacity in Gap 1 and 2 PAs
+```{r}
+a <- sum(DamCap_GAP12$oCC_EX)
+b <- sum(AllSierras_DamCapacity$oCC_EX)
+
+
+percentDamCapacity_InGap <- a/b
+
+#GAP12 areas hold ~25% of potential beaver dam building capacity
+```
+##Easements
+###Select just Easements
+
+```{r}
+PADUS_Easements <- PADUS_clip[PADUS_clip$FeatClass=="Easement",]
+
+```
+###Clip BRAT to Easements
+```{r}
+DamCap_Easements = st_intersection(AllSierras_DamCapacity, PADUS_Easements)
+
+```
+(DamCap_Blue)
+###Percent Dam Capacity in Easements
+```{r}
+c <- sum(DamCap_Easements$oCC_EX)
+b <- sum(AllSierras_DamCapacity$oCC_EX)
+
+
+percentDamCapacity_InEasements <- c/b
+
+#Easements areas hold ~25% of potential beaver dam building capacity
+```
+
+
+##Good Beaver Habitat
+###Select just Good beaver habitat from BRAT
+```{r}
+#Just GAP 12 PADUS: PADUS_Gap12
+DamCap_Blue <- AllSierras_DamCapacity[AllSierras_DamCapacity$oCC_EX > 15,]
+
+```
+
+###Clip BRAT to GAP 12
+```{r}
+DamCap_Blue_GAP12 <- st_intersection(DamCap_Blue, PADUS_Gap12)
+
+```
+
+###Percent Dam Capacity in Easements
+```{r}
+c <- sum(DamCap_Easements$oCC_EX)
+b <- sum(AllSierras_DamCapacity$oCC_EX)
+
+
+percentDamCapacity_InEasements <- c/b
+
+#Easements areas hold ~25% of potential beaver dam building capacity
+```

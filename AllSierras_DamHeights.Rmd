@@ -40,7 +40,7 @@ wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563
 #file.remove(list.files(pattern = "AllSierras_DamCapacity*",recursive = F))
 
 # Read in shapefile from previously imported shapefile
-AllSierras_DamCapacity <- readRDS("damCapacity2.rds")
+AllSierras_DamCapacity <- readRDS("AllSierras_DamCapacity.rds")
 
 #Project to wkt (NASA projection)
 AllSierras_DamCapacity <- st_transform(AllSierras_DamCapacity, wkt)
@@ -80,6 +80,7 @@ ggplot() +
 ```
 
 ###Make a grid
+#Note: Can't make a bounding box in a non-metric projection without first running this through LIS so we know what the LIS model wants the dimensions to be so we can set them for the grid. Need to have Augusto make an input file for us before we can proceed. 
 ```{r}
 #Make a bounding box extent
 #longitude	latitude
