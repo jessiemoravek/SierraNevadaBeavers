@@ -217,11 +217,47 @@ DamCap_Blue_GAP12 <- st_intersection(DamCap_Blue, PADUS_Gap12)
 
 ###Percent Dam Capacity in Easements
 ```{r}
-c <- sum(DamCap_Easements$oCC_EX)
-b <- sum(AllSierras_DamCapacity$oCC_EX)
+d <- sum(DamCap_Blue_GAP12$oCC_EX)
+e <- sum(DamCap_Blue$oCC_EX)
 
 
-percentDamCapacity_InEasements <- c/b
+percentDamCapacity_Blue_InGAP12 <- d/e
 
 #Easements areas hold ~25% of potential beaver dam building capacity
 ```
+
+##Restoration Opportunities
+###Select just highest rest opportunities from BRAT
+```{r}
+#Just GAP 12 PADUS: PADUS_Gap12
+DamCap_RestOpp <- AllSierras_DamCapacity[AllSierras_DamCapacity$oPBRC_CR != "NA",]
+
+```
+
+###Clip BRAT to GAP 12
+```{r}
+DamCap_RestOpp_GAP12 <- st_intersection(DamCap_RestOpp, PADUS_Gap12)
+
+```
+
+###Percent Dam Capacity in Easements
+```{r}
+f <- sum(DamCap_RestOpp_GAP12$oCC_EX)
+g <- sum(DamCap_RestOpp$oCC_EX)
+
+
+percentDamCapacity_RestOpp_GAP12 <- f/g
+
+#Easements areas hold ~25% of potential beaver dam building capacity
+```
+
+
+
+
+
+
+
+
+
+
+
