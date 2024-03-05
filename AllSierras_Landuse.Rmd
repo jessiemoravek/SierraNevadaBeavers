@@ -23,9 +23,11 @@ library(viridis)
 library(MetBrewer)
 library(stars)
 library(data.table)
+library(tigris)
+library(patchwork)
 ```
 
-##Prep Work
+#Prep Work
 ###NASA projection
 ```{r}
 wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
@@ -125,7 +127,7 @@ ggplot() +
 
 ```{r}
 PADUS_Gap12 <- PADUS_clip[PADUS_clip$GAP_Sts==c(1,2),]
-
+unique(PADUS_Gap12$FeatClass)
 ```
 
 ####Map
@@ -135,10 +137,10 @@ palette_discrete <- colorRampPalette(colors = c("#E41A1C", "#CCCCCC", "#4DAF4A",
 
 ggplot() +
     geom_sf(data = PADUS_Gap12,aes(color = d_GAP_Sts)) +
-    scale_fill_manual(values=palette_discrete)+
+    scale_fill_manual(values=palette_discrete, aesthetics = "fill")+
     xlab(NULL)+
     ylab(NULL)+
-    ggtitle(expression(paste("Restoration Limitations"))) + 
+    ggtitle(expression(paste("Protected Areas (GAP 1 & 2)"))) + 
     theme_minimal() +
     theme(plot.title = element_text(hjust = 0.5),
           plot.subtitle = element_text(hjust = 0.5)) 
@@ -171,90 +173,345 @@ ggplot(transform(DamCap_GAP12, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40
 a <- sum(DamCap_GAP12$oCC_EX)
 b <- sum(AllSierras_DamCapacity$oCC_EX)
 
-
 percentDamCapacity_InGap <- a/b
 
 #GAP12 areas hold ~25% of potential beaver dam building capacity
 ```
+#All Dam Building Capacity
+##Fee PAs
+###Select just fee areas in gap 1 and 2
+
+```{r}
+PADUS_Fee <- PADUS_Gap12[PADUS_Gap12$FeatClass=="Fee",]
+
+```
+###Clip BRAT to fee
+```{r}
+DamCap_Fee = st_intersection(AllSierras_DamCapacity, PADUS_Fee)
+
+```
+###Percent Dam Capacity in fee
+```{r}
+c <- sum(DamCap_Fee$oCC_EX)
+b <- sum(AllSierras_DamCapacity$oCC_EX)
+
+percentDamCapacity_InFee <- c/b
+
+#Fee areas hold ~25% of potential beaver dam building capacity
+```
+
 ##Easements
 ###Select just Easements
 
 ```{r}
-PADUS_Easements <- PADUS_clip[PADUS_clip$FeatClass=="Easement",]
-
+PADUS_Easements <- PADUS_Gap12[PADUS_Gap12$FeatClass=="Easement",]
 ```
+
 ###Clip BRAT to Easements
 ```{r}
 DamCap_Easements = st_intersection(AllSierras_DamCapacity, PADUS_Easements)
-
 ```
-(DamCap_Blue)
+
 ###Percent Dam Capacity in Easements
 ```{r}
-c <- sum(DamCap_Easements$oCC_EX)
-b <- sum(AllSierras_DamCapacity$oCC_EX)
+d <- sum(DamCap_Easements$oCC_EX)
+e <- sum(AllSierras_DamCapacity$oCC_EX)
 
-
-percentDamCapacity_InEasements <- c/b
+percentDamCapacity_InEasements <- d/e
 
 #Easements areas hold ~25% of potential beaver dam building capacity
 ```
 
+##Designations PAs
+###Select just Designation areas in gap 1 and 2
 
-##Good Beaver Habitat
-###Select just Good beaver habitat from BRAT
+```{r}
+PADUS_Desig <- PADUS_Gap12[PADUS_Gap12$FeatClass=="Designation",]
+
+```
+###Clip BRAT to Designations
+```{r}
+DamCap_Desig = st_intersection(AllSierras_DamCapacity, PADUS_Desig)
+
+```
+###Percent Dam Capacity in Designations
+```{r}
+f <- sum(DamCap_Desig$oCC_EX)
+g <- sum(AllSierras_DamCapacity$oCC_EX)
+
+percentDamCapacity_InDesig <- f/g
+
+#Designation areas hold ~25% of potential beaver dam building capacity
+```
+
+
+#Good Beaver Habitat
+##Select just Good beaver habitat from BRAT
 ```{r}
 #Just GAP 12 PADUS: PADUS_Gap12
 DamCap_Blue <- AllSierras_DamCapacity[AllSierras_DamCapacity$oCC_EX > 15,]
 
 ```
 
-###Clip BRAT to GAP 12
+##Clip BRAT to GAP 12
 ```{r}
 DamCap_Blue_GAP12 <- st_intersection(DamCap_Blue, PADUS_Gap12)
 
 ```
 
-###Percent Dam Capacity in Easements
+###Percent good dam cap in GAP 12
 ```{r}
-d <- sum(DamCap_Blue_GAP12$oCC_EX)
-e <- sum(DamCap_Blue$oCC_EX)
+h <- sum(DamCap_Blue_GAP12$oCC_EX)
+i <- sum(DamCap_Blue$oCC_EX)
 
 
-percentDamCapacity_Blue_InGAP12 <- d/e
+percentDamCapacity_Blue_InGAP12 <-h/i
 
 #Easements areas hold ~25% of potential beaver dam building capacity
 ```
 
-##Restoration Opportunities
-###Select just highest rest opportunities from BRAT
+##Fee PAs
+###Select just fee areas in gap 1 and 2
+
+```{r}
+#PADUS_Fee <- PADUS_Gap12[PADUS_Gap12$FeatClass=="Fee",]
+
+```
+###Clip BRAT to fee
+```{r}
+DamCap_Blue_Fee = st_intersection(DamCap_Blue_GAP12, PADUS_Fee)
+
+```
+###Percent Dam Capacity in fee
+```{r}
+j <- sum(DamCap_Blue_Fee$oCC_EX)
+k <- sum(DamCap_Blue_GAP12$oCC_EX)
+
+percentDamCapacity_Blue_InFee <- j/k
+
+#Fee areas hold ~25% of potential beaver dam building capacity
+```
+
+##Easements
+###Select just Easements
+
+```{r}
+#PADUS_Easements <- PADUS_Gap12[PADUS_Gap12$FeatClass=="Easement",]
+```
+
+###Clip BRAT to Easements
+```{r}
+DamCap_Blue_Easements = st_intersection(DamCap_Blue_GAP12, PADUS_Easements)
+```
+
+###Percent Dam Capacity in Easements
+```{r}
+l <- sum(DamCap_Blue_Easements$oCC_EX)
+m <- sum(DamCap_Blue_GAP12$oCC_EX)
+
+percentDamCapacity_Blue_InEasements <- l/m
+
+#Easements areas hold ~25% of potential beaver dam building capacity
+```
+
+##Designations PAs
+###Select just Designation areas in gap 1 and 2
+
+```{r}
+#PADUS_Desig <- PADUS_Gap12[PADUS_Gap12$FeatClass=="Designation",]
+
+```
+###Clip BRAT to Designations
+```{r}
+DamCap_Blue_Desig = st_intersection(DamCap_Blue_GAP12, PADUS_Desig)
+
+```
+###Percent Dam Capacity in Designations
+```{r}
+n <- sum(DamCap_Blue_Desig$oCC_EX)
+o <- sum(DamCap_Blue_GAP12$oCC_EX)
+
+percentDamCapacity_Blue_InDesig <- n/o
+
+#Designation areas hold ~25% of potential beaver dam building capacity
+```
+#Restoration Opportunities
+##Select just highest rest opportunities from BRAT
 ```{r}
 #Just GAP 12 PADUS: PADUS_Gap12
 DamCap_RestOpp <- AllSierras_DamCapacity[AllSierras_DamCapacity$oPBRC_CR != "NA",]
 
 ```
 
-###Clip BRAT to GAP 12
+##Clip BRAT to GAP 12
 ```{r}
 DamCap_RestOpp_GAP12 <- st_intersection(DamCap_RestOpp, PADUS_Gap12)
 
 ```
 
+##Percent Dam Capacity in Easements
+```{r}
+p <- sum(DamCap_RestOpp_GAP12$oCC_EX)
+q <- sum(DamCap_RestOpp$oCC_EX)
+
+
+percentDamCapacity_RestOpp_GAP12 <-p/q
+
+#Easements areas hold ~25% of potential beaver dam building capacity
+```
+##Fee PAs
+###Select just fee areas in gap 1 and 2
+
+```{r}
+#PADUS_Fee <- PADUS_Gap12[PADUS_Gap12$FeatClass=="Fee",]
+
+```
+###Clip BRAT to fee
+```{r}
+DamCap_RestOpp_Fee = st_intersection(DamCap_RestOpp_GAP12, PADUS_Fee)
+
+```
+###Percent Dam Capacity in fee
+```{r}
+r <- sum(DamCap_RestOpp_Fee$oCC_EX)
+s <- sum(DamCap_RestOpp_GAP12$oCC_EX)
+
+percentDamCapacity_RestOpp_InFee <- r/s
+
+#Fee areas hold ~25% of potential beaver dam building capacity
+```
+
+##Easements
+###Select just Easements
+
+```{r}
+#PADUS_Easements <- PADUS_Gap12[PADUS_Gap12$FeatClass=="Easement",]
+```
+
+###Clip BRAT to Easements
+```{r}
+DamCap_RestOpp_Easements = st_intersection(DamCap_RestOpp_GAP12, PADUS_Easements)
+```
+
 ###Percent Dam Capacity in Easements
 ```{r}
-f <- sum(DamCap_RestOpp_GAP12$oCC_EX)
-g <- sum(DamCap_RestOpp$oCC_EX)
+t <- sum(DamCap_RestOpp_Easements$oCC_EX)
+u <- sum(DamCap_RestOpp_GAP12$oCC_EX)
 
-
-percentDamCapacity_RestOpp_GAP12 <- f/g
+percentDamCapacity_RestOpp_InEasements <- t/u
 
 #Easements areas hold ~25% of potential beaver dam building capacity
 ```
 
+##Designations PAs
+###Select just Designation areas in gap 1 and 2
+
+```{r}
+#PADUS_Desig <- PADUS_Gap12[PADUS_Gap12$FeatClass=="Designation",]
+
+```
+###Clip BRAT to Designations
+```{r}
+DamCap_RestOpp_Desig = st_intersection(DamCap_RestOpp_GAP12, PADUS_Desig)
+
+```
+###Percent Dam Capacity in Designations
+```{r}
+v <- sum(DamCap_RestOpp_Desig$oCC_EX)
+w <- sum(DamCap_RestOpp_GAP12$oCC_EX)
+
+percentDamCapacity_RestOpp_InDesig <- v/w
+
+#Designation areas hold ~25% of potential beaver dam building capacity
+```
+
+#Figures
+##inputs
+```{r}
+#PADUS_Gap12
+#PADUS_Fee
+#PADUS_Easements
+#PADUS_Desig
+
+background <- states(cb = FALSE)
+
+background <- st_make_valid(background) %>%
+  dplyr::mutate(valid =st_is_valid(background)) %>% 
+  dplyr::filter(valid=="TRUE") 
+#^Millie's validation code...use later
+
+background <- background %>% filter(NAME == "California" | NAME == "Nevada")
+
+background <- st_transform(background, 3310)
+
+box <- st_bbox(AllSierras_DamCapacity)
+background_crop <- st_crop(background, box)
+```
+
+##Palette
+```{r}
+display_all(3, sequential=FALSE, colorblind_only=TRUE, direction=1, override.order=FALSE )
+mycolors <-met.brewer(name ='Archambault',3, type="discrete")
+mycolors[3]
+```
+
+##GAP 1&2
+```{r}
+padus <- ggplot() + 
+  geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+  geom_sf(data = PADUS_Desig, fill = "#88a0dc", color = NA, aes(shape = "Designation")) +
+  geom_sf(data = PADUS_Fee, fill = "#ed968c",color = NA, alpha = 0.8, aes(shape = "Fee")) +
+  geom_sf(data = PADUS_Easements, fill = "#f9d14a", color = NA, aes(shape = "Easement")) +
+  coord_sf(crs = st_crs(3310))+ 
+  theme_minimal() +
+  ggtitle(expression(paste("Protected Areas (GAP 1 & 2)"))) + 
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  #coord_sf(xlim = c(-124.0, -116.8), ylim = c(34, 41)) +
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+
+##Total Dam Capacity
+```{r}
+palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
+#scales::show_col(palette_new)
+
+damcap <- ggplot() +
+    geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
+    scale_color_manual(values=palette_new)+
+    theme_minimal()+
+    ggtitle(expression(paste("Maximum Dam Building Capacity"))) +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(element_text(size=10),legend.position = c(.15,.2))+
+    labs(color = "dams/km", size=10)+
+    theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+
+```{r}
+(padus + damcap)
+```
+
+
+#Boxplot
+```{r}
+ggplot()+
+  geom_boxplot(data = AllSierras_DamCapacity, (aes(x = PADUS_clip[PADUS_clip$GAP_Sts==c(1,2),], y = log(oCC_EX))))+
+  theme_minimal()+
+  ggtitle(expression(paste("Dam Capacity by PADUS"))) 
 
 
 
-
+ggplot()+
+  geom_boxplot(data = DamCap_GAP12, (aes(x = FeatClass, y = log(oCC_EX))))+
+  theme_minimal()+
+  ggtitle(expression(paste("Dam Capacity by PADUS"))) 
+```
 
 
 
