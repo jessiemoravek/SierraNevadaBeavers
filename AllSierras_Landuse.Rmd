@@ -25,6 +25,8 @@ library(stars)
 library(data.table)
 library(tigris)
 library(patchwork)
+library(car)
+library(multcomp)
 ```
 
 #Prep Work
@@ -45,7 +47,7 @@ wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563
 #file.remove(list.files(pattern = "AllSierras_DamCapacity*",recursive = F))
 
 # Read in shapefile from previously imported shapefile
-AllSierras_DamCapacity <- readRDS("AllSierras_DamCapacity.rds")
+AllSierras_DamCapacity <- readRDS("AllSierras_DamCapacity_volume.rds")
 
 #Project to Teal Albers
 AllSierras_DamCapacity <- st_transform(AllSierras_DamCapacity, 3310)
@@ -450,11 +452,16 @@ background_crop <- st_crop(background, box)
 
 ##Palette
 ```{r}
-display_all(3, sequential=FALSE, colorblind_only=TRUE, direction=1, override.order=FALSE )
+#display_all(3, sequential=FALSE, colorblind_only=TRUE, direction=1, override.order=FALSE )
 mycolors <-met.brewer(name ='Archambault',3, type="discrete")
 mycolors[3]
-```
 
+mycolors <-met.brewer(name ='Archambault',4, type="discrete")
+mycolors[3]
+
+contcolors <- met.brewer(name = "Archambault", type = "continuous")
+```
+#Maps
 ##GAP 1&2
 ```{r}
 padus <- ggplot() + 
@@ -492,29 +499,276 @@ damcap <- ggplot() +
     theme(panel.border = element_rect(colour = "black", fill=NA))
 
 ```
+##Water Volume
+```{r}
+library(viridis)
+vol <- ggplot() +
+    geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = AllSierras_DamCapacity, aes(color = volume)) +
+    scale_color_viridis(discrete = FALSE, option = "plasma", na.value = "grey70")+
+    theme_minimal()+
+    ggtitle(expression(paste("Potential Dam Water Storage "))) +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(element_text(size=10),legend.position ='right')+
+    labs(color = "Water Storage (m3)", size=10)+
+    theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+####Map
+```{r}
+ggplot() +
+    geom_sf(data = AllSierras_DamCapacity, aes(color = volume)) +
+    scale_color_viridis(discrete = FALSE, option = "plasma", na.value = "grey70")+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Potential Water Storage (m3)"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+
+```
+
 
 ```{r}
 (padus + damcap)
 ```
 
 
-#Boxplot
+#Dam Capacity Boxplot
 ```{r}
+test <- st_join(AllSierras_DamCapacity, PADUS_Gap12)
+```
+##Ttest GAP and other
+```{r}
+test$Protected <- with(test, ifelse(is.na(test$GAP_Sts), "Other", "GAP 1 & 2"))
+test$Protected <- as.factor(test$Protected)
+                                    
+ggplot(data = test, aes(x=Protected, y = log(oCC_EX)))+
+         geom_boxplot()+
+         theme_minimal()
+       
+leveneTest(oCC_EX~Protected, data = test)#significant
+ttest_1 <- t.test(oCC_EX ~ Protected, data = test)
+summary(ttest_1)
+p_value_1 <- ttest_1$p.value
+t_value_1 <- ttest_1$statistic
+estimate_gap <- ttest_1$estimate[1]
+estimate_other <- ttest_1$estimate[2]
+deg_freedom <- ttest_1$parameter
+```
+
+```{r}
+gap <- subset(test, Protected == "GAP 1 & 2")
+other <- subset(test, Protected == "Other")
+
 ggplot()+
-  geom_boxplot(data = AllSierras_DamCapacity, (aes(x = PADUS_clip[PADUS_clip$GAP_Sts==c(1,2),], y = log(oCC_EX))))+
-  theme_minimal()+
-  ggtitle(expression(paste("Dam Capacity by PADUS"))) 
+  geom_boxplot(data = gap, aes(x=Protected, y = sqrt(oCC_EX)), fill = "#e78429")+
+  geom_boxplot(data = other, aes(x=Protected, y = sqrt(oCC_EX)), fill= "grey60")+
+  theme_minimal() +
+  ggtitle(expression(paste("Dam Capacity in Protected and Non-Protected Areas"))) + 
+  xlab("Protection Status")+
+  ylab("Square Root of Dam Capacity (dams/km)")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
 
-
-
-ggplot()+
-  geom_boxplot(data = DamCap_GAP12, (aes(x = FeatClass, y = log(oCC_EX))))+
-  theme_minimal()+
-  ggtitle(expression(paste("Dam Capacity by PADUS"))) 
 ```
 
 
+##ANOVA within GAP 12
+```{r}
+DamCap_GAP12$FeatClass <- as.factor(DamCap_GAP12$FeatClass)
+                                    
+ggplot(data = DamCap_GAP12, aes(x=FeatClass, y = (oCC_EX)))+
+         geom_boxplot()+
+         theme_minimal()
+       
+leveneTest(oCC_EX~FeatClass, data = DamCap_GAP12)#significant
+anova1 <- aov(oCC_EX ~ FeatClass, data = DamCap_GAP12)
+anova1_residuals <- residuals(object = anova1)
+
+ggplot(anova1, aes(x = .fitted, y = .resid))+
+  geom_point() + theme_classic()
+#shapiro.test(x = anova1_residuals)#too big
+
+#try square root transformation
+DamCap_GAP12 <- DamCap_GAP12 %>% mutate(sqrtvalue=sqrt(oCC_EX))
+anova2 <- aov(sqrtvalue ~ FeatClass, data = DamCap_GAP12)
+
+ggplot(data = DamCap_GAP12, aes(x=FeatClass, y = (sqrtvalue)))+
+         geom_boxplot()+
+         theme_minimal()
+
+leveneTest(sqrtvalue~FeatClass, data = DamCap_GAP12)#significant
+
+kruskal.test(sqrtvalue ~ FeatClass, data = DamCap_GAP12)
+
+#PostHoc on the square root transformation
+summary(anova2)
+tukey <- TukeyHSD(anova2)
+print(tukey)
+```
+```{r}
+desig <- subset(DamCap_GAP12, FeatClass == "Designation")
+fee <- subset(DamCap_GAP12, FeatClass == "Fee")
+easement <- subset(DamCap_GAP12, FeatClass == "Easement")
 
 
+ggplot()+
+  geom_boxplot(data = desig, aes(x=FeatClass, y = sqrt(oCC_EX)), fill = "#88a0dc") +
+  geom_boxplot(data = fee, aes(x=FeatClass, y = sqrt(oCC_EX)), fill = "#ed968c") +
+  geom_boxplot(data = easement, aes(x=FeatClass, y = sqrt(oCC_EX)), fill = "#f9d14a") +
+  theme_minimal() +
+  ggtitle(expression(paste("Dam Capacity in GAP 1&2 Areas"))) + 
+  xlab("Land Ownership Type")+
+  ylab("Square Root of Dam Capacity (dams/km)")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+
+#High Quality Haibtat Boxplot
+```{r}
+#test <- st_join(AllSierras_DamCapacity, PADUS_Gap12)
+highquality <- subset(test, oCC_EX >= 10) #pull out good habitat
+
+```
+##Ttest GAP and other
+```{r}
+highquality$Protected <- as.factor(highquality$Protected)
+                                    
+ggplot(data = highquality, aes(x=Protected, y = oCC_EX))+
+         geom_boxplot()+
+         theme_minimal()
+       
+leveneTest(oCC_EX~Protected, data = highquality)#significant
+ttest_2 <- t.test(oCC_EX ~ Protected, data = highquality)
+summary(ttest_2)
+p_value_2 <- ttest_2$p.value
+t_value_2 <- ttest_2$statistic
+estimate_gap <- ttest_2$estimate[1]
+estimate_other <- ttest_2$estimate[2]
+deg_freedom <- ttest_2$parameter
+```
+####Map
+```{r}
+palette_new <- colorRampPalette(colors = c( "#00FF50", "#4900FF"))(2)
+#scales::show_col(palette_new)
+
+ggplot(transform(highquality, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40), include.lowest=T))) +
+    geom_sf(aes(color = DamCapacity)) +
+    scale_color_manual(values=palette_new)+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Dam Capacity (Dams/km)"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+
+```
+
+```{r}
+gap2 <- subset(highquality, Protected == "GAP 1 & 2")
+other2 <- subset(highquality, Protected == "Other")
+
+ggplot()+
+  geom_boxplot(data = gap2, aes(x=Protected, y = sqrt(oCC_EX)), fill = "#e78429")+
+  geom_boxplot(data = other2, aes(x=Protected, y = sqrt(oCC_EX)), fill= "grey60")+
+  theme_minimal() +
+  ggtitle(expression(paste("High Quality Dam Capacity in Protected and Non-Protected Areas"))) + 
+  xlab("Protection Status")+
+  ylab("Square Root of Dam Capacity (dams/km)")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
 
 
+##Ttest GAP and other
+```{r}
+highquality_gap12 <- subset(DamCap_GAP12, oCC_EX >= 10) #pull out good habitat
+highquality_gap12$FeatClass <- as.factor(highquality_gap12$FeatClass)
+
+                                    
+ggplot(data = highquality_gap12, aes(x=FeatClass, y = (oCC_EX)))+
+         geom_boxplot()+
+         theme_minimal()
+       
+leveneTest(oCC_EX~FeatClass, data = highquality_gap12)#significant
+anova1 <- aov(oCC_EX ~ FeatClass, data = highquality_gap12)
+anova1_residuals <- residuals(object = anova1)
+
+ggplot(anova1, aes(x = .fitted, y = .resid))+
+  geom_point() + theme_classic()
+#shapiro.test(x = anova1_residuals)#too big
+
+#try square root transformation
+highquality_gap12 <- highquality_gap12 %>% mutate(sqrtvalue=sqrt(oCC_EX))
+anova2 <- aov(sqrtvalue ~ FeatClass, data = highquality_gap12)
+
+ggplot(data = highquality_gap12, aes(x=FeatClass, y = (sqrtvalue)))+
+         geom_boxplot()+
+         theme_minimal()
+
+leveneTest(sqrtvalue~FeatClass, data = highquality_gap12)#significant
+
+kruskal.test(oCC_EX ~ FeatClass, data = highquality_gap12)#Hmm...not significant if nonparametric
+
+#PostHoc on the square root transformation
+summary(anova2)
+tukey <- TukeyHSD(anova2)
+print(tukey)
+```
+```{r}
+desig <- subset(highquality_gap12, FeatClass == "Designation")
+fee <- subset(highquality_gap12, FeatClass == "Fee")
+easement <- subset(highquality_gap12, FeatClass == "Easement")
+
+
+ggplot()+
+  geom_boxplot(data = desig, aes(x=FeatClass, y = sqrt(oCC_EX)), fill = "#88a0dc") +
+  geom_boxplot(data = fee, aes(x=FeatClass, y = sqrt(oCC_EX)), fill = "#ed968c") +
+  geom_boxplot(data = easement, aes(x=FeatClass, y = sqrt(oCC_EX)), fill = "#f9d14a") +
+  theme_minimal() +
+  ggtitle(expression(paste("High Quality Dam Capacity in GAP 1&2 Areas"))) + 
+  xlab("Land Ownership Type")+
+  ylab("Square Root of Dam Capacity (dams/km)")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+
+#Volume Boxplot
+```{r}
+test <- st_join(AllSierras_DamCapacity, PADUS_Gap12)
+```
+##Ttest GAP and other
+```{r}
+test$Protected <- with(test, ifelse(is.na(test$GAP_Sts), "Other", "GAP 1 & 2"))
+test$Protected <- as.factor(test$Protected)
+                                    
+ggplot(data = test, aes(x=Protected, y = log(volume)))+
+         geom_boxplot()+
+         theme_minimal()
+       
+leveneTest(volume~Protected, data = test)#significant
+ttest3 <- t.test(volume ~ Protected, data = test)
+summary(ttest3)
+p_value3 <- ttest3$p.value
+t_value3 <- ttest3$statistic
+estimate_gap3 <- ttest3$estimate[1]
+estimate_other3 <- ttest3$estimate[2]
+deg_freedom3 <- ttest3$parameter
+```

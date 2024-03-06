@@ -110,25 +110,24 @@ study_area$id = 1:nrow(study_area)
 
 ###Volume calculation
 ```{r}
-damCapacity2_v <- damCapacity2
-for (i in damCapacity2_v){ #for each stream segment in the BRAT model output shapefile
-  damCt <- damCapacity2_v$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_EX_CT in the attribute table)
-  slope <- damCapacity2_v$iGeo_Slope #meters
-  da <- damCapacity2_v$iGeo_DA #m2
+for (i in AllSierras_DamCapacity){ #for each stream segment in the BRAT model output shapefile
+  damCt <- AllSierras_DamCapacity$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_EX_CT in the attribute table)
+  slope <- AllSierras_DamCapacity$iGeo_Slope #meters
+  da <- AllSierras_DamCapacity$iGeo_DA #m2
   width <- ifelse(da < 4.95,2.18*(da)^0.191,
                   ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
   height <- 1 #assume all beaver dams are 1m tall
   length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
-  maxLength<- (damCapacity2_v$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
+  maxLength<- (AllSierras_DamCapacity$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
   volume <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt))
   surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damCt),(width)*(maxLength)*(damCt))
-  damCapacity2_v$width <- width
-  damCapacity2_v$volume <- volume #m3
-  damCapacity2_v$surfaceArea <- surfaceArea #m2
+  AllSierras_DamCapacity$width <- width
+  AllSierras_DamCapacity$volume <- volume #m3
+  AllSierras_DamCapacity$surfaceArea <- surfaceArea #m2
 } 
 
 
-saveRDS(damCapacity2_v,"damCapacity2_v.rds")
+saveRDS(AllSierras_DamCapacity,"AllSierras_DamCapacity_volume.rds")
 ```
 
 ###Volume by grid cell
