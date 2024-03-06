@@ -3,7 +3,7 @@ title: "AllSierras_LandUse"
 output: html_document
 ---
 
-```{r}
+```{r include=FALSE}
 library(tidyverse)
 library(ggplot2)
 library(dplyr)
@@ -37,6 +37,16 @@ wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563
 #California Teal Albers EPSG = 3310
 ```
 
+###Input Files (all together)
+```{r}
+AllSierras_DamCapacity <- readRDS("AllSierras_DamCapacity_volume.rds")
+PADUS <- readRDS("PADUS.rds")
+WatershedBoundaries <- readRDS("WatershedBoundaries.rds")
+PADUS_clip = st_intersection(PADUS, WatershedBoundaries)
+PADUS_Gap12 <- PADUS_clip[PADUS_clip$GAP_Sts==c(1,2),]
+DamCap_GAP12 = st_intersection(AllSierras_DamCapacity, PADUS_Gap12)
+
+```
 
 ###Dam Capacity
 ```{r}
@@ -562,11 +572,11 @@ deg_freedom <- ttest_1$parameter
 gap <- subset(test, Protected == "GAP 1 & 2")
 other <- subset(test, Protected == "Other")
 
-ggplot()+
+p1 <- ggplot()+
   geom_boxplot(data = gap, aes(x=Protected, y = sqrt(oCC_EX)), fill = "#e78429")+
   geom_boxplot(data = other, aes(x=Protected, y = sqrt(oCC_EX)), fill= "grey60")+
   theme_minimal() +
-  ggtitle(expression(paste("Dam Capacity in Protected and Non-Protected Areas"))) + 
+  ggtitle(expression(paste("Dam Capacity"))) + 
   xlab("Protection Status")+
   ylab("Square Root of Dam Capacity (dams/km)")+
   theme(plot.title = element_text(hjust = 0.5),
@@ -611,18 +621,19 @@ summary(anova2)
 tukey <- TukeyHSD(anova2)
 print(tukey)
 ```
+
 ```{r}
 desig <- subset(DamCap_GAP12, FeatClass == "Designation")
 fee <- subset(DamCap_GAP12, FeatClass == "Fee")
 easement <- subset(DamCap_GAP12, FeatClass == "Easement")
 
 
-ggplot()+
+p2 <- ggplot()+
   geom_boxplot(data = desig, aes(x=FeatClass, y = sqrt(oCC_EX)), fill = "#88a0dc") +
   geom_boxplot(data = fee, aes(x=FeatClass, y = sqrt(oCC_EX)), fill = "#ed968c") +
   geom_boxplot(data = easement, aes(x=FeatClass, y = sqrt(oCC_EX)), fill = "#f9d14a") +
   theme_minimal() +
-  ggtitle(expression(paste("Dam Capacity in GAP 1&2 Areas"))) + 
+  ggtitle(expression(paste("Dam Capacity"))) + 
   xlab("Land Ownership Type")+
   ylab("Square Root of Dam Capacity (dams/km)")+
   theme(plot.title = element_text(hjust = 0.5),
@@ -632,6 +643,55 @@ ggplot()+
   theme(panel.border = element_rect(colour = "black", fill=NA))
 
 ```
+
+##Total dams GAP12 vs. other
+```{r}
+#Use mCC_EX_CT- maximum number of dams
+gap <- subset(test, Protected == "GAP 1 & 2")
+other <- subset(test, Protected == "Other")
+
+p3 <- ggplot()+
+  geom_col(data = gap, aes(x=Protected, y = mCC_EX_CT), fill = "#e78429")+
+  geom_col(data = other, aes(x=Protected, y = mCC_EX_CT), fill= "grey60")+
+  theme_minimal() +
+  ggtitle(expression(paste("Number of Dams"))) + 
+  xlab("Protection Status")+
+  ylab("Number of Dams")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+##Dams in GAP12 in Desig, Fee, and Easement
+```{r}
+desig <- subset(DamCap_GAP12, FeatClass == "Designation")
+fee <- subset(DamCap_GAP12, FeatClass == "Fee")
+easement <- subset(DamCap_GAP12, FeatClass == "Easement")
+
+
+p4 <- ggplot()+
+  geom_col(data = desig, aes(x=FeatClass, y = (mCC_EX_CT)), fill = "#88a0dc") +
+  geom_col(data = fee, aes(x=FeatClass, y = (mCC_EX_CT)), fill = "#ed968c") +
+  geom_col(data = easement, aes(x=FeatClass, y = (mCC_EX_CT)), fill = "#f9d14a") +
+  theme_minimal() +
+  ggtitle(expression(paste("Number of Dams"))) + 
+  xlab("Land Ownership Type")+
+  ylab("Number of Dams")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  #labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+
+```{r}
+(p3 + p1)
+(p4 + p2)
+```
+
+
+
 
 #High Quality Haibtat Boxplot
 ```{r}
@@ -677,7 +737,7 @@ ggplot(transform(highquality, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40)
 gap2 <- subset(highquality, Protected == "GAP 1 & 2")
 other2 <- subset(highquality, Protected == "Other")
 
-ggplot()+
+h1 <- ggplot()+
   geom_boxplot(data = gap2, aes(x=Protected, y = sqrt(oCC_EX)), fill = "#e78429")+
   geom_boxplot(data = other2, aes(x=Protected, y = sqrt(oCC_EX)), fill= "grey60")+
   theme_minimal() +
@@ -728,13 +788,14 @@ summary(anova2)
 tukey <- TukeyHSD(anova2)
 print(tukey)
 ```
+
 ```{r}
 desig <- subset(highquality_gap12, FeatClass == "Designation")
 fee <- subset(highquality_gap12, FeatClass == "Fee")
 easement <- subset(highquality_gap12, FeatClass == "Easement")
 
 
-ggplot()+
+h2 <- ggplot()+
   geom_boxplot(data = desig, aes(x=FeatClass, y = sqrt(oCC_EX)), fill = "#88a0dc") +
   geom_boxplot(data = fee, aes(x=FeatClass, y = sqrt(oCC_EX)), fill = "#ed968c") +
   geom_boxplot(data = easement, aes(x=FeatClass, y = sqrt(oCC_EX)), fill = "#f9d14a") +
@@ -749,6 +810,52 @@ ggplot()+
   theme(panel.border = element_rect(colour = "black", fill=NA))
 
 ```
+##Total dams GAP12 vs. other
+```{r}
+#Use mCC_EX_CT- maximum number of dams
+gap <- subset(highquality, Protected == "GAP 1 & 2")
+other <- subset(highquality, Protected == "Other")
+
+h3 <- ggplot()+
+  geom_col(data = gap, aes(x=Protected, y = mCC_EX_CT), fill = "#e78429")+
+  geom_col(data = other, aes(x=Protected, y = mCC_EX_CT), fill= "grey60")+
+  theme_minimal() +
+  ggtitle(expression(paste("Number of Dams"))) + 
+  xlab("Protection Status")+
+  ylab("Number of Dams")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+##Dams in GAP12 in Desig, Fee, and Easement
+```{r}
+desig <- subset(highquality_gap12, FeatClass == "Designation")
+fee <- subset(highquality_gap12, FeatClass == "Fee")
+easement <- subset(highquality_gap12, FeatClass == "Easement")
+
+
+h4 <- ggplot()+
+  geom_col(data = desig, aes(x=FeatClass, y = (mCC_EX_CT)), fill = "#88a0dc") +
+  geom_col(data = fee, aes(x=FeatClass, y = (mCC_EX_CT)), fill = "#ed968c") +
+  geom_col(data = easement, aes(x=FeatClass, y = (mCC_EX_CT)), fill = "#f9d14a") +
+  theme_minimal() +
+  ggtitle(expression(paste("Number of Dams"))) + 
+  xlab("Land Ownership Type")+
+  ylab("Number of Dams")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  #labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+
+```{r}
+(h3 + h1)
+(h4 + h2)
+```
+
 
 #Volume Boxplot
 ```{r}
@@ -772,3 +879,333 @@ estimate_gap3 <- ttest3$estimate[1]
 estimate_other3 <- ttest3$estimate[2]
 deg_freedom3 <- ttest3$parameter
 ```
+```{r}
+gap <- subset(test, Protected == "GAP 1 & 2")
+other <- subset(test, Protected == "Other")
+
+v1 <- ggplot()+
+  geom_boxplot(data = gap, aes(x=Protected, y = sqrt(volume)), fill = "#e78429")+
+  geom_boxplot(data = other, aes(x=Protected, y = sqrt(volume)), fill= "grey60")+
+  theme_minimal() +
+  ggtitle(expression(paste("Potential Water Storage in Protected and Non-Protected Areas"))) + 
+  xlab("Protection Status")+
+  ylab("Square Root of Volume (m3)")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+
+##ANOVA within GAP 12
+```{r}
+DamCap_GAP12$FeatClass <- as.factor(DamCap_GAP12$FeatClass)
+                                    
+ggplot(data = DamCap_GAP12, aes(x=FeatClass, y = (oCC_EX)))+
+         geom_boxplot()+
+         theme_minimal()
+       
+leveneTest(volume~FeatClass, data = DamCap_GAP12)#significant
+anova1 <- aov(volume ~ FeatClass, data = DamCap_GAP12)
+anova1_residuals <- residuals(object = anova1)
+
+ggplot(anova1, aes(x = .fitted, y = .resid))+
+  geom_point() + theme_classic()
+#shapiro.test(x = anova1_residuals)#too big
+
+#try square root transformation
+DamCap_GAP12 <- DamCap_GAP12 %>% mutate(sqrtvalue=sqrt(volume))
+anova2 <- aov(sqrtvalue ~ FeatClass, data = DamCap_GAP12)
+
+ggplot(data = DamCap_GAP12, aes(x=FeatClass, y = (sqrtvalue)))+
+         geom_boxplot()+
+         theme_minimal()
+
+leveneTest(sqrtvalue~FeatClass, data = DamCap_GAP12)#significant
+
+kruskal.test(sqrtvalue ~ FeatClass, data = DamCap_GAP12)
+
+#PostHoc on the square root transformation
+summary(anova2)
+tukey <- TukeyHSD(anova2)
+print(tukey)
+```
+
+```{r}
+desig <- subset(DamCap_GAP12, FeatClass == "Designation")
+fee <- subset(DamCap_GAP12, FeatClass == "Fee")
+easement <- subset(DamCap_GAP12, FeatClass == "Easement")
+
+
+v2 <- ggplot()+
+  geom_boxplot(data = desig, aes(x=FeatClass, y = sqrt(volume)), fill = "#88a0dc") +
+  geom_boxplot(data = fee, aes(x=FeatClass, y = sqrt(volume)), fill = "#ed968c") +
+  geom_boxplot(data = easement, aes(x=FeatClass, y = sqrt(volume)), fill = "#f9d14a") +
+  theme_minimal() +
+  ggtitle(expression(paste("Potential Water Storagein GAP 1&2 Areas"))) + 
+  xlab("Land Ownership Type")+
+  ylab("Square Root of Volume (m3)")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+##Total dams GAP12 vs. other
+```{r}
+#Use mCC_EX_CT- maximum number of dams
+gap <- subset(test, Protected == "GAP 1 & 2")
+other <- subset(test, Protected == "Other")
+
+v3 <- ggplot()+
+  geom_col(data = gap, aes(x=Protected, y = volume), fill = "#e78429")+
+  geom_col(data = other, aes(x=Protected, y = volume), fill= "grey60")+
+  theme_minimal() +
+  ggtitle(expression(paste("Total Volume"))) + 
+  xlab("Protection Status")+
+  ylab("Total Volume (m3)")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+##Dams in GAP12 in Desig, Fee, and Easement
+```{r}
+desig <- subset(DamCap_GAP12, FeatClass == "Designation")
+fee <- subset(DamCap_GAP12, FeatClass == "Fee")
+easement <- subset(DamCap_GAP12, FeatClass == "Easement")
+
+
+v4 <- ggplot()+
+  geom_col(data = desig, aes(x=FeatClass, y = (volume)), fill = "#88a0dc") +
+  geom_col(data = fee, aes(x=FeatClass, y = (volume)), fill = "#ed968c") +
+  geom_col(data = easement, aes(x=FeatClass, y = (volume)), fill = "#f9d14a") +
+  theme_minimal() +
+  ggtitle(expression(paste("Total Volume"))) + 
+  xlab("Land Ownership Type")+
+  ylab("Total Volume (m3)")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  #labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+
+```{r}
+(v3 + v1)
+(v4 + v2)
+```
+
+
+
+#High Quality Volume Boxplot
+```{r}
+#test <- st_join(AllSierras_DamCapacity, PADUS_Gap12)
+highquality <- subset(test, oCC_EX >= 10) #pull out good habitat
+
+```
+
+####Map
+```{r}
+ggplot() +
+    geom_sf(data = highquality, aes(color = volume)) +
+    scale_color_viridis(discrete = FALSE, option = "plasma", na.value = "grey70")+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Potential Water Storage (m3)"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+
+```
+##Ttest GAP and other
+```{r}
+highquality$Protected <- with(highquality, ifelse(is.na(highquality$GAP_Sts), "Other", "GAP 1 & 2"))
+highquality$Protected <- as.factor(highquality$Protected)
+                                    
+ggplot(data = highquality, aes(x=Protected, y = log(volume)))+
+         geom_boxplot()+
+         theme_minimal()
+       
+leveneTest(volume~Protected, data = highquality)#significant
+ttest3 <- t.test(volume ~ Protected, data = highquality)
+summary(ttest3)
+p_value3 <- ttest3$p.value
+t_value3 <- ttest3$statistic
+estimate_gap3 <- ttest3$estimate[1]
+estimate_other3 <- ttest3$estimate[2]
+deg_freedom3 <- ttest3$parameter
+```
+
+
+```{r}
+gap <- subset(highquality, Protected == "GAP 1 & 2")
+other <- subset(highquality, Protected == "Other")
+
+hv1 <- ggplot()+
+  geom_boxplot(data = gap, aes(x=Protected, y = sqrt(volume)), fill = "#e78429")+
+  geom_boxplot(data = other, aes(x=Protected, y = sqrt(volume)), fill= "grey60")+
+  theme_minimal() +
+  ggtitle(expression(paste("High Quality Volume"))) + 
+  xlab("Protection Status")+
+  ylab("Square Root of Volume (m3)")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+##ANOVA within GAP 12
+```{r}
+highquality_gap12 <- subset(DamCap_GAP12, oCC_EX >= 10) #pull out good habitat
+highquality_gap12$FeatClass <- as.factor(highquality_gap12$FeatClass)
+
+                                                 
+ggplot(data = highquality_gap12, aes(x=FeatClass, y = (oCC_EX)))+
+         geom_boxplot()+
+         theme_minimal()
+       
+leveneTest(volume~FeatClass, data = highquality_gap12)#significant
+anova1 <- aov(volume ~ FeatClass, data = highquality_gap12)
+anova1_residuals <- residuals(object = anova1)
+
+ggplot(anova1, aes(x = .fitted, y = .resid))+
+  geom_point() + theme_classic()
+#shapiro.test(x = anova1_residuals)#too big
+
+#try square root transformation
+highquality_gap12 <- highquality_gap12 %>% mutate(sqrtvalue=sqrt(volume))
+anova2 <- aov(sqrtvalue ~ FeatClass, data = highquality_gap12)
+
+ggplot(data = highquality_gap12, aes(x=FeatClass, y = (sqrtvalue)))+
+         geom_boxplot()+
+         theme_minimal()
+
+leveneTest(sqrtvalue~FeatClass, data = highquality_gap12)#significant
+
+kruskal.test(sqrtvalue ~ FeatClass, data = highquality_gap12)
+
+#PostHoc on the square root transformation
+summary(anova2)
+tukey <- TukeyHSD(anova2)
+print(tukey)
+```
+
+
+```{r}
+desig <- subset(highquality_gap12, FeatClass == "Designation")
+fee <- subset(highquality_gap12, FeatClass == "Fee")
+easement <- subset(highquality_gap12, FeatClass == "Easement")
+
+
+hv2 <- ggplot()+
+  geom_boxplot(data = desig, aes(x=FeatClass, y = sqrt(volume)), fill = "#88a0dc") +
+  geom_boxplot(data = fee, aes(x=FeatClass, y = sqrt(volume)), fill = "#ed968c") +
+  geom_boxplot(data = easement, aes(x=FeatClass, y = sqrt(volume)), fill = "#f9d14a") +
+  theme_minimal() +
+  ggtitle(expression(paste("High Quality Volume in GAP 1&2 Areas"))) + 
+  xlab("Land Ownership Type")+
+  ylab("Square Root of Volume (m3)")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+##Total dams GAP12 vs. other
+```{r}
+#Use mCC_EX_CT- maximum number of dams
+gap <- subset(highquality, Protected == "GAP 1 & 2")
+other <- subset(highquality, Protected == "Other")
+
+hv3 <- ggplot()+
+  geom_col(data = gap, aes(x=Protected, y = volume), fill = "#e78429")+
+  geom_col(data = other, aes(x=Protected, y = volume), fill= "grey60")+
+  theme_minimal() +
+  ggtitle(expression(paste("High Quality Volume"))) + 
+  xlab("Protection Status")+
+  ylab("Volume (m3)")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+##Dams in GAP12 in Desig, Fee, and Easement
+```{r}
+desig <- subset(highquality_gap12, FeatClass == "Designation")
+fee <- subset(highquality_gap12, FeatClass == "Fee")
+easement <- subset(highquality_gap12, FeatClass == "Easement")
+
+
+hv4 <- ggplot()+
+  geom_col(data = desig, aes(x=FeatClass, y = (volume)), fill = "#88a0dc") +
+  geom_col(data = fee, aes(x=FeatClass, y = (volume)), fill = "#ed968c") +
+  geom_col(data = easement, aes(x=FeatClass, y = (volume)), fill = "#f9d14a") +
+  theme_minimal() +
+  ggtitle(expression(paste("High Quality Volume"))) + 
+  xlab("Land Ownership Type")+
+  ylab("Volume (m3)")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  #labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+
+```{r}
+(hv3 + hv1)
+(hv4 + hv2)
+```
+
+
+#Bar Plots
+##Total dams GAP12 vs. other
+```{r}
+#Use mCC_EX_CT- maximum number of dams
+gap <- subset(test, Protected == "GAP 1 & 2")
+other <- subset(test, Protected == "Other")
+
+ggplot()+
+  geom_col(data = gap, aes(x=Protected, y = mCC_EX_CT), fill = "#e78429")+
+  geom_col(data = other, aes(x=Protected, y = mCC_EX_CT), fill= "grey60")+
+  theme_minimal() +
+  ggtitle(expression(paste("Number of Dams in Protected and Non-Protected Areas"))) + 
+  xlab("Protection Status")+
+  ylab("Number of Dams")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+##Dams in GAP12 in Desig, Fee, and Easement
+```{r}
+desig <- subset(DamCap_GAP12, FeatClass == "Designation")
+fee <- subset(DamCap_GAP12, FeatClass == "Fee")
+easement <- subset(DamCap_GAP12, FeatClass == "Easement")
+
+
+ggplot()+
+  geom_col(data = desig, aes(x=FeatClass, y = (mCC_EX_CT)), fill = "#88a0dc") +
+  geom_col(data = fee, aes(x=FeatClass, y = (mCC_EX_CT)), fill = "#ed968c") +
+  geom_col(data = easement, aes(x=FeatClass, y = (mCC_EX_CT)), fill = "#f9d14a") +
+  theme_minimal() +
+  ggtitle(expression(paste("Number of Dams in GAP 1&2 Areas"))) + 
+  xlab("Land Ownership Type")+
+  ylab("Number of Dams")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  #labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+##
+
+
+
