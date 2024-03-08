@@ -578,7 +578,7 @@ p1 <- ggplot()+
   theme_minimal() +
   ggtitle(expression(paste("Dam Capacity"))) + 
   xlab("Protection Status")+
-  ylab("Square Root of Dam Capacity (dams/km)")+
+  ylab("Sqrt Dam Capacity (dams/km)")+
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5)) +
   #theme(legend.position = c(.15,.15))+
@@ -635,7 +635,7 @@ p2 <- ggplot()+
   theme_minimal() +
   ggtitle(expression(paste("Dam Capacity"))) + 
   xlab("Land Ownership Type")+
-  ylab("Square Root of Dam Capacity (dams/km)")+
+  ylab("Sqrt Dam Capacity (dams/km)")+
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5)) +
   #theme(legend.position = c(.15,.15))+
@@ -686,8 +686,7 @@ p4 <- ggplot()+
 ```
 
 ```{r}
-(p3 + p1)
-(p4 + p2)
+(p3 + p1)/ (p4 + p2)
 ```
 
 
@@ -852,8 +851,7 @@ h4 <- ggplot()+
 ```
 
 ```{r}
-(h3 + h1)
-(h4 + h2)
+(h3 + h1) / (h4 + h2)
 ```
 
 
@@ -887,7 +885,7 @@ v1 <- ggplot()+
   geom_boxplot(data = gap, aes(x=Protected, y = sqrt(volume)), fill = "#e78429")+
   geom_boxplot(data = other, aes(x=Protected, y = sqrt(volume)), fill= "grey60")+
   theme_minimal() +
-  ggtitle(expression(paste("Potential Water Storage in Protected and Non-Protected Areas"))) + 
+  ggtitle(expression(paste("Volume by Reach"))) + 
   xlab("Protection Status")+
   ylab("Square Root of Volume (m3)")+
   theme(plot.title = element_text(hjust = 0.5),
@@ -943,7 +941,7 @@ v2 <- ggplot()+
   geom_boxplot(data = fee, aes(x=FeatClass, y = sqrt(volume)), fill = "#ed968c") +
   geom_boxplot(data = easement, aes(x=FeatClass, y = sqrt(volume)), fill = "#f9d14a") +
   theme_minimal() +
-  ggtitle(expression(paste("Potential Water Storagein GAP 1&2 Areas"))) + 
+  ggtitle(expression(paste("Volume by Reach"))) + 
   xlab("Land Ownership Type")+
   ylab("Square Root of Volume (m3)")+
   theme(plot.title = element_text(hjust = 0.5),
@@ -995,8 +993,7 @@ v4 <- ggplot()+
 ```
 
 ```{r}
-(v3 + v1)
-(v4 + v2)
+(v3 + v1) / (v4 + v2)
 ```
 
 
@@ -1148,7 +1145,7 @@ hv4 <- ggplot()+
   geom_col(data = fee, aes(x=FeatClass, y = (volume)), fill = "#ed968c") +
   geom_col(data = easement, aes(x=FeatClass, y = (volume)), fill = "#f9d14a") +
   theme_minimal() +
-  ggtitle(expression(paste("High Quality Volume"))) + 
+  ggtitle(expression(paste("High Quality Volume in GAP 1&2 Areas"))) + 
   xlab("Land Ownership Type")+
   ylab("Volume (m3)")+
   theme(plot.title = element_text(hjust = 0.5),
@@ -1159,8 +1156,7 @@ hv4 <- ggplot()+
 ```
 
 ```{r}
-(hv3 + hv1)
-(hv4 + hv2)
+(hv3 + hv1) / (hv4 + hv2)
 ```
 
 
