@@ -1,0 +1,207 @@
+---
+title: "AllSierras_Historical"
+output: html_document
+---
+
+```{r include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(dataRetrieval)
+library(sf)
+library(maps)
+library(sp)
+library(ncdf4)
+library(sf)
+library(sp)
+library(lwgeom)
+library(terra)
+library(raster)
+library(mapview)
+library(tidyterra)
+library(viridis)
+library(MetBrewer)
+library(stars)
+library(data.table)
+library(tigris)
+library(patchwork)
+library(car)
+library(multcomp)
+```
+
+#Input Files (all together)
+```{r}
+AllSierras_DamCapacity <- readRDS("AllSierras_DamCapacity_volume.rds")
+PADUS <- readRDS("PADUS.rds")
+WatershedBoundaries <- readRDS("WatershedBoundaries.rds")
+PADUS_clip <- readRDS("PADUS_clip.rds")
+PADUS_Gap12 <- readRDS("PADUS_Gap12.rds")
+DamCap_GAP12 <- readRDS("DamCap_GAP12.rds")
+TNC_DamCapacity <- readRDS("TNC_DamCapacity.rds")
+
+```
+##Map
+```{r}
+palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
+#scales::show_col(palette_new)
+
+c <- ggplot() +
+    #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
+    scale_color_manual(values=palette_new)+
+    theme_minimal()+
+    ggtitle(expression(paste("Current Dam Capacity"))) +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(element_text(size=10),legend.position = c(.15,.2))+
+    labs(color = "dams/km", size=10)+
+    theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+
+```{r}
+h <- ggplot() +
+    #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(oCC_HPE, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
+    scale_color_manual(values=palette_new)+
+    theme_minimal()+
+    ggtitle(expression(paste("Historical Dam Capacity"))) +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(element_text(size=10),legend.position = c(.15,.2))+
+    labs(color = "dams/km", size=10)+
+    theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+
+```{r}
+(h + c)
+```
+##Calculate Historical Percent Remaining
+```{r}
+AllSierras_DamCapacity$mCC_EXvHPE <- AllSierras_DamCapacity$oCC_EX/AllSierras_DamCapacity$oCC_HPE
+#When doing this division, sometimes we get 0/0 = Inf, especially in areas that are slope limited. In one way of looking at it, these values should be converted to 1, since dam capacity stayed the same from historic to current. However we converted them to NA? 
+AllSierras_DamCapacity$mCC_EXvHPE[!is.finite(AllSierras_DamCapacity$mCC_EXvHPE)] <- NA
+summary(AllSierras_DamCapacity$mCC_EXvHPE)
+```
+
+```{r}
+r <- ggplot() +
+    #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(mCC_EXvHPE, breaks = c(0,.25,.5,.75,1,70), include.lowest=T)),aes(color = DamCapacity)) +
+    scale_color_manual(values=palette_new)+
+    theme_minimal()+
+    ggtitle(expression(paste("Percent Dam Capacity Remaining"))) +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(element_text(size=10),legend.position = c(.15,.2))+
+    labs(color = "dams/km", size=10)+
+    theme(panel.border = element_rect(colour = "black", fill=NA))
+r
+```
+##Ttest Percent Dam Cap remaining, GAP and Other
+```{r}
+AllSierras_DamCapacity <- st_join(AllSierras_DamCapacity, PADUS_Gap12)
+
+```
+
+```{r}
+
+AllSierras_DamCapacity$Protected <- with(AllSierras_DamCapacity, ifelse(is.na(AllSierras_DamCapacity$GAP_Sts), "Other", "GAP 1 & 2"))
+AllSierras_DamCapacity$Protected <- as.factor(AllSierras_DamCapacity$Protected)
+
+ggplot(data = AllSierras_DamCapacity, aes(x=Protected, y = (mCC_EXvHPE)))+
+         geom_boxplot()+
+         theme_minimal()
+       
+leveneTest(mCC_EXvHPE~Protected, data = AllSierras_DamCapacity)#significant
+ttest_1 <- t.test(mCC_EXvHPE ~ Protected, data = AllSierras_DamCapacity)
+summary(ttest_1)
+ttest_1
+
+```
+
+##Total dams lost
+```{r}
+gap <- subset(AllSierras_DamCapacity, Protected == "GAP 1 & 2")
+other <- subset(AllSierras_DamCapacity, Protected == "Other")
+
+p1 <- ggplot()+
+  geom_boxplot(data = gap, aes(x=Protected, y = sqrt(mCC_EXvHPE)), fill = "#e78429")+
+  geom_boxplot(data = other, aes(x=Protected, y = sqrt(mCC_EXvHPE)), fill= "grey60")+
+  theme_minimal() +
+  ggtitle(expression(paste("Dam Capacity"))) + 
+  xlab("Protection Status")+
+  ylab("Sqrt % Change in Dam Capacity")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+
+##ANOVA within GAP 12
+```{r}
+###Clip BRAT to GAP 1 and 2 area
+DamCap_GAP12 = st_intersection(AllSierras_DamCapacity, PADUS_Gap12)
+DamCap_GAP12$FeatClass <- as.factor(DamCap_GAP12$FeatClass)
+                                    
+ggplot(data = DamCap_GAP12, aes(x=FeatClass, y = log(mCC_EXvHPE)))+
+         geom_boxplot()+
+         theme_minimal()
+       
+leveneTest(mCC_EXvHPE~FeatClass, data = DamCap_GAP12)#significant
+anova1 <- aov(mCC_EXvHPE ~ FeatClass, data = DamCap_GAP12)
+anova1_residuals <- residuals(object = anova1)
+
+ggplot(anova1, aes(x = .fitted, y = .resid))+
+  geom_point() + theme_classic()#bad
+#shapiro.test(x = anova1_residuals)#too big
+
+#try square root transformation
+DamCap_GAP12 <- DamCap_GAP12 %>% mutate(sqrtvalue=sqrt(mCC_EXvHPE))
+anova2 <- aov(sqrtvalue ~ FeatClass, data = DamCap_GAP12)
+
+ggplot(data = DamCap_GAP12, aes(x=FeatClass, y = (sqrtvalue)))+
+         geom_boxplot()+
+         theme_minimal()
+
+leveneTest(sqrtvalue~FeatClass, data = DamCap_GAP12)#significant
+
+kruskal.test(sqrtvalue ~ FeatClass, data = DamCap_GAP12)
+
+#PostHoc on the square root transformation
+summary(anova2)
+tukey <- TukeyHSD(anova2)
+print(tukey)
+```
+
+```{r}
+desig <- subset(DamCap_GAP12, FeatClass == "Designation")
+fee <- subset(DamCap_GAP12, FeatClass == "Fee")
+easement <- subset(DamCap_GAP12, FeatClass == "Easement")
+
+
+p2 <- ggplot()+
+  geom_boxplot(data = desig, aes(x=FeatClass, y = sqrt(mCC_EXvHPE)), fill = "#88a0dc") +
+  geom_boxplot(data = fee, aes(x=FeatClass, y = sqrt(mCC_EXvHPE)), fill = "#ed968c") +
+  geom_boxplot(data = easement, aes(x=FeatClass, y = sqrt(mCC_EXvHPE)), fill = "#f9d14a") +
+  theme_minimal() +
+  ggtitle(expression(paste("% Change in Dam Capacity"))) + 
+  xlab("Land Ownership Type")+
+  ylab("Sqrt % Change in Dam Capacity")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+```{r}
+p1 + p2
+```
+
+
+
+
