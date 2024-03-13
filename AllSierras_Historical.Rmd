@@ -85,6 +85,26 @@ AllSierras_DamCapacity$mCC_EXvHPE[!is.finite(AllSierras_DamCapacity$mCC_EXvHPE)]
 summary(AllSierras_DamCapacity$mCC_EXvHPE)
 ```
 
+
+```{r}
+mean(AllSierras_DamCapacity$mCC_EXvHPE, na.rm=T)#60% dam cap remaining by capacity 
+existingsum <- sum(AllSierras_DamCapacity$mCC_EX_CT)
+historicalsum <- sum(AllSierras_DamCapacity$mCC_HPE_CT)
+existingsum/historicalsum # 51% dam cap remaining by count
+
+```
+##Ttest dam cap remaining
+```{r}
+ggplot(data = AllSierras_DamCapacity, aes(x=Protected, y = (mCC_EXvHPE)))+
+         geom_boxplot()+
+         theme_minimal()
+       
+leveneTest(mCC_EXvHPE~Protected, data = AllSierras_DamCapacity)#significant
+ttest_1 <- t.test(mCC_EXvHPE ~ Protected, data = AllSierras_DamCapacity)
+summary(ttest_1)
+ttest_1
+
+```
 ```{r}
 r <- ggplot() +
     #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
@@ -130,7 +150,7 @@ p1 <- ggplot()+
   geom_boxplot(data = gap, aes(x=Protected, y = sqrt(mCC_EXvHPE)), fill = "#e78429")+
   geom_boxplot(data = other, aes(x=Protected, y = sqrt(mCC_EXvHPE)), fill= "grey60")+
   theme_minimal() +
-  ggtitle(expression(paste("Dam Capacity"))) + 
+  ggtitle(expression(paste("% Change in Dam Capacity"))) + 
   xlab("Protection Status")+
   ylab("Sqrt % Change in Dam Capacity")+
   theme(plot.title = element_text(hjust = 0.5),
@@ -201,6 +221,130 @@ p2 <- ggplot()+
 ```{r}
 p1 + p2
 ```
+#Change in veg suitability
+```{r}
+AllSierras_DamCapacity$VegChange100 <-  AllSierras_DamCapacity$iVeg100EX - AllSierras_DamCapacity$iVeg100Hpe 
+
+```
+
+
+```{r}
+
+veg <- ggplot() +
+    geom_sf(data = AllSierras_DamCapacity, aes(color = VegChange100)) +
+    scale_color_gradient2(low = "red", mid = "white", high = "blue", midpoint = 0, na.value = "grey70")+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Vegetation Change"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+```
+#Change in volume
+##Historical volume
+```{r}
+for (i in AllSierras_DamCapacity){ #for each stream segment in the BRAT model output shapefile
+  damCt <- AllSierras_DamCapacity$mCC_HPE_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_HPE_CT in the attribute table)
+  slope <- AllSierras_DamCapacity$iGeo_Slope #meters
+  da <- AllSierras_DamCapacity$iGeo_DA #m2
+  width <- ifelse(da < 4.95,2.18*(da)^0.191,
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
+  height <- 1 #assume all beaver dams are 1m tall
+  length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
+  maxLength<- (AllSierras_DamCapacity$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
+  volumeHist <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt))
+  surfaceAreaHist <- ifelse(length < maxLength, (width)*(length)*(damCt),(width)*(maxLength)*(damCt))
+  AllSierras_DamCapacity$width <- width
+  AllSierras_DamCapacity$volumeHist <- volumeHist #m3
+  AllSierras_DamCapacity$surfaceAreaHist <- surfaceAreaHist #m2
+} 
+
+```
+
+#Ma
+```{r}
+ggplot() +
+    geom_sf(data = AllSierras_DamCapacity, aes(color = volumeHist)) +
+    scale_color_viridis(discrete = FALSE, option = "plasma", na.value = "grey70")+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Potential Water Storage (m3)"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+```
+##Volume Change
+```{r}
+AllSierras_DamCapacity$VolumeChange <-  AllSierras_DamCapacity$volume - AllSierras_DamCapacity$volumeHist
+
+```
+
+```{r}
+vol <- ggplot() +
+    geom_sf(data = AllSierras_DamCapacity, aes(color = VolumeChange)) +
+    scale_color_gradient2(low = "red", mid = "grey70", high = "blue", midpoint = 0, na.value = "grey70")+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Change in Volume (m3)"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+```
+
+```{r}
+vol + veg
+```
+##Summarize with numbers
+```{r}
+sum(AllSierras_DamCapacity$VolumeChange )
+currentstor <- sum(AllSierras_DamCapacity$volume)
+historicalstor <- sum(AllSierras_DamCapacity$volumeHist)
+percentleft <- currentstor/historicalstor
+
+volchange <- currentstor-historicalstor
+```
+#Limitations
+```{r}
+unique(AllSierras_DamCapacity$oPBRC_UD)
+length(AllSierras_DamCapacity$oPBRC_UD)
+
+
+DamBuildingPossible <- (length(AllSierras_DamCapacity$oPBRC_UD[AllSierras_DamCapacity$oPBRC_UD == "Dam Building Possible"]))/(length(AllSierras_DamCapacity$oPBRC_UD))
+
+StreamPowerLimited <- (length(AllSierras_DamCapacity$oPBRC_UD[AllSierras_DamCapacity$oPBRC_UD == "Stream Power Limited"]))/(length(AllSierras_DamCapacity$oPBRC_UD))
+
+NaturallyVegetationLimited <- (length(AllSierras_DamCapacity$oPBRC_UD[AllSierras_DamCapacity$oPBRC_UD == "Naturally Vegetation Limited"]))/(length(AllSierras_DamCapacity$oPBRC_UD))
+
+StreamSizeLimited <- (length(AllSierras_DamCapacity$oPBRC_UD[AllSierras_DamCapacity$oPBRC_UD == "Stream Size Limited"]))/(length(AllSierras_DamCapacity$oPBRC_UD))
+
+PotentialReservoir <- (length(AllSierras_DamCapacity$oPBRC_UD[AllSierras_DamCapacity$oPBRC_UD == "Potential Reservoir or Landuse"]))/(length(AllSierras_DamCapacity$oPBRC_UD))
+
+SlopeLimited <- (length(AllSierras_DamCapacity$oPBRC_UD[AllSierras_DamCapacity$oPBRC_UD == "Slope Limited"]))/(length(AllSierras_DamCapacity$oPBRC_UD))
+
+AnthropogenicallyLimited <- (length(AllSierras_DamCapacity$oPBRC_UD[AllSierras_DamCapacity$oPBRC_UD == "Anthropogenically Limited"]))/(length(AllSierras_DamCapacity$oPBRC_UD))
+
+a <- c('DamBuildingPossible','StreamPowerLimited','NaturallyVegetationLimited','StreamSizeLimited','PotentialReservoir','SlopeLimited','AnthropogenicallyLimited') 
+b <- c(DamBuildingPossible,StreamPowerLimited,NaturallyVegetationLimited,StreamSizeLimited,PotentialReservoir,SlopeLimited,AnthropogenicallyLimited) 
+df <- data.frame(a,b)
+
+colnames(df) <- c("Limitation", "Proportion")
+df$Percent <- df$Proportion * 100
+df
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

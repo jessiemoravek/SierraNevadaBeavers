@@ -375,7 +375,7 @@ percentDamCapacity_RestOpp_GAP12 <-p/q
 ###Select just fee areas in gap 1 and 2
 
 ```{r}
-#PADUS_Fee <- PADUS_Gap12[PADUS_Gap12$FeatClass=="Fee",]
+PADUS_Fee <- PADUS_Gap12[PADUS_Gap12$FeatClass=="Fee",]
 
 ```
 ###Clip BRAT to fee
@@ -397,7 +397,7 @@ percentDamCapacity_RestOpp_InFee <- r/s
 ###Select just Easements
 
 ```{r}
-#PADUS_Easements <- PADUS_Gap12[PADUS_Gap12$FeatClass=="Easement",]
+PADUS_Easements <- PADUS_Gap12[PADUS_Gap12$FeatClass=="Easement",]
 ```
 
 ###Clip BRAT to Easements
@@ -419,7 +419,7 @@ percentDamCapacity_RestOpp_InEasements <- t/u
 ###Select just Designation areas in gap 1 and 2
 
 ```{r}
-#PADUS_Desig <- PADUS_Gap12[PADUS_Gap12$FeatClass=="Designation",]
+PADUS_Desig <- PADUS_Gap12[PADUS_Gap12$FeatClass=="Designation",]
 
 ```
 ###Clip BRAT to Designations
