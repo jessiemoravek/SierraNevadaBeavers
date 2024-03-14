@@ -38,9 +38,27 @@ PADUS_clip <- readRDS("PADUS_clip.rds")
 PADUS_Gap12 <- readRDS("PADUS_Gap12.rds")
 DamCap_GAP12 <- readRDS("DamCap_GAP12.rds")
 TNC_DamCapacity <- readRDS("TNC_DamCapacity.rds")
+fireRisk <- readRDS("fireRisk.rds")
+tribalLands <- readRDS("tribalLands.rds")
 
 ```
-##Map
+
+##Watershed Boundaries Map
+```{r}
+w <- ggplot() +
+    geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = WatershedBoundaries, fill = "#b0b0b0", lwd = 0.1, alpha = 0.5 ) +
+    scale_color_manual(values=palette_new)+
+    theme_minimal()+
+    ggtitle(expression(paste("Watershed Boundaries"))) +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    #theme(element_text(size=10),legend.position = c(.15,.2))+
+    #labs(color = "dams/km", size=10)+
+    theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+##Current Dam Capacity Map
 ```{r}
 palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
 #scales::show_col(palette_new)
@@ -58,7 +76,7 @@ c <- ggplot() +
     theme(panel.border = element_rect(colour = "black", fill=NA))
 
 ```
-
+##Historical Dam Capacity Map
 ```{r}
 h <- ggplot() +
     #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
@@ -73,11 +91,11 @@ h <- ggplot() +
     theme(panel.border = element_rect(colour = "black", fill=NA))
 
 ```
-
+##Both Current and Historical Dam Capacity Maps
 ```{r}
 (h + c)
 ```
-##Calculate Historical Percent Remaining
+#Calculate Historical Percent Remaining
 ```{r}
 AllSierras_DamCapacity$mCC_EXvHPE <- AllSierras_DamCapacity$oCC_EX/AllSierras_DamCapacity$oCC_HPE
 #When doing this division, sometimes we get 0/0 = Inf, especially in areas that are slope limited. In one way of looking at it, these values should be converted to 1, since dam capacity stayed the same from historic to current. However we converted them to NA? 
@@ -85,7 +103,7 @@ AllSierras_DamCapacity$mCC_EXvHPE[!is.finite(AllSierras_DamCapacity$mCC_EXvHPE)]
 summary(AllSierras_DamCapacity$mCC_EXvHPE)
 ```
 
-
+##Summarize Historical Percent Remaining
 ```{r}
 mean(AllSierras_DamCapacity$mCC_EXvHPE, na.rm=T)#60% dam cap remaining by capacity 
 existingsum <- sum(AllSierras_DamCapacity$mCC_EX_CT)
@@ -93,18 +111,8 @@ historicalsum <- sum(AllSierras_DamCapacity$mCC_HPE_CT)
 existingsum/historicalsum # 51% dam cap remaining by count
 
 ```
-##Ttest dam cap remaining
-```{r}
-ggplot(data = AllSierras_DamCapacity, aes(x=Protected, y = (mCC_EXvHPE)))+
-         geom_boxplot()+
-         theme_minimal()
-       
-leveneTest(mCC_EXvHPE~Protected, data = AllSierras_DamCapacity)#significant
-ttest_1 <- t.test(mCC_EXvHPE ~ Protected, data = AllSierras_DamCapacity)
-summary(ttest_1)
-ttest_1
 
-```
+##Percent Remaining Map
 ```{r}
 r <- ggplot() +
     #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
@@ -129,14 +137,9 @@ AllSierras_DamCapacity <- st_join(AllSierras_DamCapacity, PADUS_Gap12)
 
 AllSierras_DamCapacity$Protected <- with(AllSierras_DamCapacity, ifelse(is.na(AllSierras_DamCapacity$GAP_Sts), "Other", "GAP 1 & 2"))
 AllSierras_DamCapacity$Protected <- as.factor(AllSierras_DamCapacity$Protected)
-
-ggplot(data = AllSierras_DamCapacity, aes(x=Protected, y = (mCC_EXvHPE)))+
-         geom_boxplot()+
-         theme_minimal()
        
 leveneTest(mCC_EXvHPE~Protected, data = AllSierras_DamCapacity)#significant
 ttest_1 <- t.test(mCC_EXvHPE ~ Protected, data = AllSierras_DamCapacity)
-summary(ttest_1)
 ttest_1
 
 ```
@@ -218,16 +221,41 @@ p2 <- ggplot()+
   theme(panel.border = element_rect(colour = "black", fill=NA))
 
 ```
+##Both boxplots together
 ```{r}
 p1 + p2
 ```
+#Volume ~ Dam Capacity
+```{r}
+lm_volume <- lm(AllSierras_DamCapacity$volume ~ AllSierras_DamCapacity$oCC_EX)
+lm_volume
+```
+
+```{r}
+ggplot()+
+  geom_point(data = AllSierras_DamCapacity, aes(x = oCC_EX, y = volume))+
+  #stat_summary(fun.data=lm_volume) + 
+  geom_smooth(method='lm', formula= x~y) +
+  theme_minimal() +
+  ggtitle(expression(paste("Volume ~ Dam Capacity"))) + 
+  xlab("Current Dam Capacity (dams/km)")+
+  ylab("Potential Water Storage (m3)")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  #labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+hist(AllSierras_DamCapacity$oCC_EX, breaks = 160)
+```
+
+
 #Change in veg suitability
 ```{r}
 AllSierras_DamCapacity$VegChange100 <-  AllSierras_DamCapacity$iVeg100EX - AllSierras_DamCapacity$iVeg100Hpe 
 
 ```
 
-
+##Change in veg suitability map
 ```{r}
 
 veg <- ggplot() +
@@ -241,7 +269,7 @@ veg <- ggplot() +
           plot.subtitle = element_text(hjust = 0.5)) 
 ```
 #Change in volume
-##Historical volume
+##Historical volume calculation
 ```{r}
 for (i in AllSierras_DamCapacity){ #for each stream segment in the BRAT model output shapefile
   damCt <- AllSierras_DamCapacity$mCC_HPE_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_HPE_CT in the attribute table)
@@ -261,7 +289,7 @@ for (i in AllSierras_DamCapacity){ #for each stream segment in the BRAT model ou
 
 ```
 
-#Ma
+##Historical volume map
 ```{r}
 ggplot() +
     geom_sf(data = AllSierras_DamCapacity, aes(color = volumeHist)) +
@@ -278,7 +306,7 @@ ggplot() +
 AllSierras_DamCapacity$VolumeChange <-  AllSierras_DamCapacity$volume - AllSierras_DamCapacity$volumeHist
 
 ```
-
+##Volume change map
 ```{r}
 vol <- ggplot() +
     geom_sf(data = AllSierras_DamCapacity, aes(color = VolumeChange)) +
@@ -291,6 +319,7 @@ vol <- ggplot() +
           plot.subtitle = element_text(hjust = 0.5)) 
 ```
 
+##Volume change + Veg change in the same frame
 ```{r}
 vol + veg
 ```
@@ -333,15 +362,239 @@ df
 ```
 
 
+#Fire Risk
+##Clip
+```{r}
+fireRisk = st_intersection(WatershedBoundaries, fireRisk)
+```
+##Join Fire Risk with Dam Capacity
+```{r}
+AllSierras_DamCapacity <- st_join(AllSierras_DamCapacity, fireRisk)
+```
+
+##Pull out individual designations
+```{r}
+unique(AllSierras_DamCapacity$HAZ_CLASS)
+moderate <- AllSierras_DamCapacity[AllSierras_DamCapacity$HAZ_CLASS=="Moderate",]
+high <- AllSierras_DamCapacity[AllSierras_DamCapacity$HAZ_CLASS=="High",]
+veryHigh <- AllSierras_DamCapacity[fireRisk$HAZ_CLASS=="Very High",]
+
+```
+
+##Map
+```{r}
+fire <- ggplot() + 
+  #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+  geom_sf(data = moderate, fill = "#ffff00", color = NA, aes(shape = "Moderate")) +
+  geom_sf(data = high, fill = "#ffa500",color = NA, alpha = 0.8, aes(shape = "High")) +
+  geom_sf(data = veryHigh, fill = "#ff0000", color = NA, aes(shape = "Very High")) +
+  coord_sf(crs = st_crs(3310))+ 
+  theme_minimal() +
+  ggtitle(expression(paste("Fire Risk (State Responsibility Areas)"))) + 
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = c(.25,.15))+
+  labs(shape = "")+
+  #coord_sf(xlim = c(-124.0, -116.8), ylim = c(34, 41)) +
+  theme(panel.border = element_rect(colour = "black", fill=NA))
 
 
 
+```
+
+##ANOVA fire risk Dam Capacity
+```{r}
+AllSierras_DamCapacity$HAZ_CLASS <- as.factor(AllSierras_DamCapacity$HAZ_CLASS)
+                                    
+ggplot(data = AllSierras_DamCapacity, aes(x=HAZ_CLASS, y = log(oCC_EX)))+
+         geom_boxplot()+
+         theme_minimal()
+       
+leveneTest(oCC_EX~HAZ_CLASS, data = AllSierras_DamCapacity)#significant
+anova_fire <- aov(oCC_EX ~ HAZ_CLASS, data = AllSierras_DamCapacity)
+anova_fire_resid <- residuals(object = anova_fire)
+
+ggplot(anova_fire_resid, aes(x = .fitted, y = .resid))+
+  geom_point() + theme_classic()#fine
+#shapiro.test(x = anova1_residuals)#too big
+
+kruskal.test(oCC_EX ~ HAZ_CLASS, data = AllSierras_DamCapacity)
+
+#PostHoc on the square root transformation
+summary(anova_fire)
+tukey <- TukeyHSD(anova_fire)
+print(tukey)
+```
+
+```{r}
+moderate <- subset(AllSierras_DamCapacity, HAZ_CLASS == "Moderate")
+high <- subset(AllSierras_DamCapacity, HAZ_CLASS == "High")
+veryHigh <- subset(AllSierras_DamCapacity, HAZ_CLASS == "Very High")
+
+  
+f1 <- ggplot()+
+  geom_boxplot(data = moderate, aes(x=HAZ_CLASS, y = oCC_EX), fill = "#ffff00") +
+  geom_boxplot(data = high, aes(x=HAZ_CLASS, y = oCC_EX), fill = "#ffa500") +
+  geom_boxplot(data = veryHigh, aes(x=HAZ_CLASS, y = oCC_EX), fill = "#ff0000") +
+  theme_minimal() +
+  ggtitle(expression(paste("Dam Capacity by Fire Risk"))) + 
+  xlab("Fire Risk")+
+  ylab("Dam Capacity (dams/km)")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+##ANOVA fire risk % change Dam Capacity
+```{r}
+AllSierras_DamCapacity$HAZ_CLASS <- as.factor(AllSierras_DamCapacity$HAZ_CLASS)
+                                    
+ggplot(data = AllSierras_DamCapacity, aes(x=HAZ_CLASS, y = log(mCC_EXvHPE)))+
+         geom_boxplot()+
+         theme_minimal()
+       
+leveneTest(mCC_EXvHPE~HAZ_CLASS, data = AllSierras_DamCapacity)#significant
+anova_fire <- aov(mCC_EXvHPE ~ HAZ_CLASS, data = AllSierras_DamCapacity)
+anova_fire_resid <- residuals(object = anova_fire)
+
+ggplot(anova_fire_resid, aes(x = .fitted, y = .resid))+
+  geom_point() + theme_classic()#fine
+#shapiro.test(x = anova1_residuals)#too big
+
+kruskal.test(mCC_EXvHPE ~ HAZ_CLASS, data = AllSierras_DamCapacity)
+
+#PostHoc on the square root transformation
+summary(anova_fire)
+tukey <- TukeyHSD(anova_fire)
+print(tukey)
+```
+
+```{r}
+f2 <- ggplot()+
+  geom_boxplot(data = moderate, aes(x=HAZ_CLASS, y = sqrt(mCC_EXvHPE)), fill = "#ffff00") +
+  geom_boxplot(data = high, aes(x=HAZ_CLASS, y = sqrt(mCC_EXvHPE)), fill = "#ffa500") +
+  geom_boxplot(data = veryHigh, aes(x=HAZ_CLASS, y = sqrt(mCC_EXvHPE)), fill = "#ff0000") +
+  theme_minimal() +
+  ggtitle(expression(paste("% Change in Dam Capacity by Fire Risk"))) + 
+  xlab("Fire Risk")+
+  ylab("Sqrt % Change in Dam Capacity")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+```{r}
+f1 + f2
+```
+
+#Tribal Lands
+##Clip
+```{r}
+tribalLands = st_intersection(WatershedBoundaries, tribalLands)
+```
+##Join Tribal Lands with Dam Capacity
+```{r}
+AllSierras_DamCapacity <- st_join(AllSierras_DamCapacity, tribalLands)
+```
+
+
+##Map
+```{r}
+tl <- ggplot() + 
+  #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+  geom_sf(data = WatershedBoundaries, fill = "#dcdcdc",alpha = 0.5 ) +
+  geom_sf(data = tribalLands, fill = "#ff0000", lwd = 0.1) +
+  coord_sf(crs = st_crs(3310))+ 
+  theme_minimal() +
+  ggtitle(expression(paste("Federally Recognized Tribal Lands"))) + 
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = c(.25,.15))+
+  labs(shape = "")+
+  #coord_sf(xlim = c(-124.0, -116.8), ylim = c(34, 41)) +
+  theme(panel.border = element_rect(colour = "black", fill=NA))
 
 
 
+```
+##ANOVA Tribal Lands Dam Capacity
+```{r}
+AllSierras_DamCapacity$TribalLand <- with(AllSierras_DamCapacity,
+       ifelse(is.na(AllSierras_DamCapacity$Name) & is.na(AllSierras_DamCapacity$Protected), "Other", 
+          ifelse(!is.na(AllSierras_DamCapacity$Name),"Tribal Land",
+                 ifelse(!is.na(AllSierras_DamCapacity$Protected), "Gap 1 & 2", 
+                        NA))))
+
+#AllSierras_DamCapacity <- 
+  
+  
+AllSierras_DamCapacity %>% 
+  mutate(TribalLand = pmap_chr(select(., 'Name')), ~
+           case_when(!is.na(Name)
+                     
+                     
+                     
+                     case_when(
+    Name != NA ~ 'Tribal Land',
+    Protected == "Gap 1 & 2" ~ 'Gap 1 & 2',
+    Name == NA & Protected == NA ~ 'Other'
+  ))
+
+problem %>%
+     mutate(finalstatus =  pmap_chr(select(., starts_with('status')), ~ 
+       case_when(any(c(...) == "completed")~ "completed",
+             any(c(...) == "withdrawn") ~ "no action", 
+     TRUE ~ "registered")))
 
 
+?case_when
+AllSierras_DamCapacity$TribalLand <- as.factor(AllSierras_DamCapacity$Name)
+                                    
+ggplot(data = AllSierras_DamCapacity, aes(x=TribalLand, y = log(oCC_EX)))+
+         geom_boxplot()+
+         theme_minimal()
+       
+leveneTest(oCC_EX~HAZ_CLASS, data = AllSierras_DamCapacity)#significant
+anova_fire <- aov(oCC_EX ~ HAZ_CLASS, data = AllSierras_DamCapacity)
+anova_fire_resid <- residuals(object = anova_fire)
 
+ggplot(anova_fire_resid, aes(x = .fitted, y = .resid))+
+  geom_point() + theme_classic()#fine
+#shapiro.test(x = anova1_residuals)#too big
+
+kruskal.test(oCC_EX ~ HAZ_CLASS, data = AllSierras_DamCapacity)
+
+#PostHoc on the square root transformation
+summary(anova_fire)
+tukey <- TukeyHSD(anova_fire)
+print(tukey)
+```
+
+```{r}
+other <- subset(AllSierras_DamCapacity, TribalLand == "Other")
+gap <- subset(AllSierras_DamCapacity, TribalLand == "Gap 1 & 2")
+tribalLand <- subset(AllSierras_DamCapacity, TribalLand == "Tribal Land")
+
+  
+f1 <- ggplot()+
+  geom_boxplot(data = other, aes(x=TribalLand, y = oCC_EX), fill = "#ffff00") +
+  geom_boxplot(data = gap, aes(x=TribalLand, y = oCC_EX), fill = "#ffa500") +
+  geom_boxplot(data = tribalLand, aes(x=TribalLand, y = oCC_EX), fill = "#ff0000") +
+  theme_minimal() +
+  ggtitle(expression(paste("Dam Capacity by Land Type"))) + 
+  xlab("Fire Risk")+
+  ylab("Dam Capacity (dams/km)")+
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  #theme(legend.position = c(.15,.15))+
+  labs(shape = "")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
 
 
 
