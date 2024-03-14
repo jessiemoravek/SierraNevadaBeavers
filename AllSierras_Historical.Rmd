@@ -491,6 +491,41 @@ f2 <- ggplot()+
 f1 + f2
 ```
 
+#Large Complexes
+```{r}
+complex <- AllSierras_DamCapacity[AllSierras_DamCapacity$mCC_EX_CT >5,]
+complexHist <- AllSierras_DamCapacity[AllSierras_DamCapacity$mCC_HPE_CT >5,]
+```
+
+```{r}
+nrow(complex) / nrow(AllSierras_DamCapacity)
+nrow(complexHist) / nrow(AllSierras_DamCapacity)
+(sum(complex$Shape_Leng.x))*.001
+(sum(complexHist$Shape_Leng.x))*.001
+
+```
+
+
+####Map
+```{r}
+palette_new <- colorRampPalette(colors = c( "#00FF50", "#4900FF"))(2)
+#scales::show_col(palette_new)
+
+ggplot() +
+    geom_sf(data = complex, color = "#4900FF") +
+    scale_color_manual(values=palette_new)+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Complexes >5 dams"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+
+
+
 #Tribal Lands
 ##Clip
 ```{r}
