@@ -360,6 +360,22 @@ colnames(df) <- c("Limitation", "Proportion")
 df$Percent <- df$Proportion * 100
 df
 ```
+##Map
+```{r}
+palette_discrete <- colorRampPalette(colors = c("#E41A1C", "#CCCCCC", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#0070FF"))(7)
+#scales::show_col(palette_new)
+
+ggplot() +
+    geom_sf(data = AllSierras_DamCapacity,aes(color = oPBRC_UD)) +
+    scale_color_manual(values=palette_discrete)+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Restoration Limitations"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+
+```
 
 
 #Fire Risk
@@ -631,9 +647,27 @@ f1 <- ggplot()+
 
 ```
 
+#Restoration opporunities
+```{r}
+DamCap_RestOpp <- AllSierras_DamCapacity[AllSierras_DamCapacity$oPBRC_CR != "NA",]
 
+```
 
+```{r}
+palette_discrete <- colorRampPalette(colors = c("#E41A1C", "#CCCCCC", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#0070FF"))(7)
+#scales::show_col(palette_new)
 
+ggplot() +
+    geom_sf(data = AllSierras_DamCapacity,aes(color = oPBRC_CR)) +
+    scale_color_manual(values=palette_discrete)+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Restoration Opportunities"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+
+```
 
 
 

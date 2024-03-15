@@ -1201,7 +1201,12 @@ ggplot()+
   #labs(shape = "")+
   theme(panel.border = element_rect(colour = "black", fill=NA))
 ```
-##
+#Restoration opporunities
+```{r}
+DamCap_RestOpp <- AllSierras_DamCapacity[AllSierras_DamCapacity$oPBRC_CR != "NA",]
+
+```
+
 
 
 
