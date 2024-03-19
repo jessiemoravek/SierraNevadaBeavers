@@ -506,6 +506,26 @@ f2 <- ggplot()+
 ```{r}
 f1 + f2
 ```
+#Fire Risk Continuous
+```{r}
+# Read in the raster (already projected and clipped in ArcPro)
+contFireRisk <- rast("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/FireRisk/FireRisk_Clip.tif")
+plot(contFireRisk)
+
+#visualie
+contFireRisk_df <- as.data.frame(contFireRisk, xy=T)
+ggplot() +
+    geom_raster(data = contFireRisk_df , aes(x = x, y = y, fill = Band_1)) +
+    scale_fill_viridis_c() +
+    coord_quickmap()
+hist(contFireRisk_df$Band_1)
+saveRDS(contFireRisk,"contFireRisk.rds")
+
+#The WHP has continous "fire risk values" that in this area go from 0 to 42223. Those are an index developed to indiccate Wildfire Hazard Potential (WHP). See metadata for more information. 
+#This is a continuous dataset but much like BRAT is often presented as categorical for visualization purposes. 
+```
+
+
 
 #Large Complexes
 ```{r}
@@ -567,82 +587,6 @@ tl <- ggplot() +
   theme(legend.position = c(.25,.15))+
   labs(shape = "")+
   #coord_sf(xlim = c(-124.0, -116.8), ylim = c(34, 41)) +
-  theme(panel.border = element_rect(colour = "black", fill=NA))
-
-
-
-```
-##ANOVA Tribal Lands Dam Capacity
-```{r}
-AllSierras_DamCapacity$TribalLand <- with(AllSierras_DamCapacity,
-       ifelse(is.na(AllSierras_DamCapacity$Name) & is.na(AllSierras_DamCapacity$Protected), "Other", 
-          ifelse(!is.na(AllSierras_DamCapacity$Name),"Tribal Land",
-                 ifelse(!is.na(AllSierras_DamCapacity$Protected), "Gap 1 & 2", 
-                        NA))))
-
-#AllSierras_DamCapacity <- 
-  
-  
-AllSierras_DamCapacity %>% 
-  mutate(TribalLand = pmap_chr(select(., 'Name')), ~
-           case_when(!is.na(Name)
-                     
-                     
-                     
-                     case_when(
-    Name != NA ~ 'Tribal Land',
-    Protected == "Gap 1 & 2" ~ 'Gap 1 & 2',
-    Name == NA & Protected == NA ~ 'Other'
-  ))
-
-problem %>%
-     mutate(finalstatus =  pmap_chr(select(., starts_with('status')), ~ 
-       case_when(any(c(...) == "completed")~ "completed",
-             any(c(...) == "withdrawn") ~ "no action", 
-     TRUE ~ "registered")))
-
-
-?case_when
-AllSierras_DamCapacity$TribalLand <- as.factor(AllSierras_DamCapacity$Name)
-                                    
-ggplot(data = AllSierras_DamCapacity, aes(x=TribalLand, y = log(oCC_EX)))+
-         geom_boxplot()+
-         theme_minimal()
-       
-leveneTest(oCC_EX~HAZ_CLASS, data = AllSierras_DamCapacity)#significant
-anova_fire <- aov(oCC_EX ~ HAZ_CLASS, data = AllSierras_DamCapacity)
-anova_fire_resid <- residuals(object = anova_fire)
-
-ggplot(anova_fire_resid, aes(x = .fitted, y = .resid))+
-  geom_point() + theme_classic()#fine
-#shapiro.test(x = anova1_residuals)#too big
-
-kruskal.test(oCC_EX ~ HAZ_CLASS, data = AllSierras_DamCapacity)
-
-#PostHoc on the square root transformation
-summary(anova_fire)
-tukey <- TukeyHSD(anova_fire)
-print(tukey)
-```
-
-```{r}
-other <- subset(AllSierras_DamCapacity, TribalLand == "Other")
-gap <- subset(AllSierras_DamCapacity, TribalLand == "Gap 1 & 2")
-tribalLand <- subset(AllSierras_DamCapacity, TribalLand == "Tribal Land")
-
-  
-f1 <- ggplot()+
-  geom_boxplot(data = other, aes(x=TribalLand, y = oCC_EX), fill = "#ffff00") +
-  geom_boxplot(data = gap, aes(x=TribalLand, y = oCC_EX), fill = "#ffa500") +
-  geom_boxplot(data = tribalLand, aes(x=TribalLand, y = oCC_EX), fill = "#ff0000") +
-  theme_minimal() +
-  ggtitle(expression(paste("Dam Capacity by Land Type"))) + 
-  xlab("Fire Risk")+
-  ylab("Dam Capacity (dams/km)")+
-  theme(plot.title = element_text(hjust = 0.5),
-        plot.subtitle = element_text(hjust = 0.5)) +
-  #theme(legend.position = c(.15,.15))+
-  labs(shape = "")+
   theme(panel.border = element_rect(colour = "black", fill=NA))
 
 ```
