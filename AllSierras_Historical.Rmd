@@ -45,8 +45,10 @@ tribalLands <- readRDS("tribalLands.rds")
 
 ##Watershed Boundaries Map
 ```{r}
+palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
+
 w <- ggplot() +
-    geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, fill = "#b0b0b0", lwd = 0.1, alpha = 0.5 ) +
     scale_color_manual(values=palette_new)+
     theme_minimal()+
@@ -60,7 +62,6 @@ w <- ggplot() +
 ```
 ##Current Dam Capacity Map
 ```{r}
-palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
 #scales::show_col(palette_new)
 
 c <- ggplot() +
@@ -332,6 +333,52 @@ percentleft <- currentstor/historicalstor
 
 volchange <- currentstor-historicalstor
 ```
+#Apply volume to every watershed
+```{r}
+WatershedBoundaries <- mutate(WatershedBoundaries, ID=row_number())
+watersheds <- st_join(AllSierras_DamCapacity,WatershedBoundaries)
+?st_join
+
+test <- watersheds %>%
+    group_by(ID) %>% 
+    summarise(num = n(),
+              totalVol = sum(volume),
+              totalVolHist = sum(volumeHist),
+              totalVolChange = sum(VolumeChange))
+
+ggplot() +
+    geom_sf(data = watersheds, aes(x = totalVol)) +
+    scale_color_viridis(discrete = FALSE, option = "plasma", na.value = "grey70")+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Change in Volume (m3)"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) 
+
+
+ggplot() + 
+  geom_sf(data = test, fill = test$totalVol) +
+  scale_color_viridis(discrete = FALSE, option = "plasma", na.value = "grey70")+
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("Change in Volume (m3)"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) 
+
+
+ggplot(test, aes(fill = totalVol)) +
+    geom_sf()+
+    scale_fill_gradientn(colours=rev(magma(6)),
+                         name="Total Volume (m3)",
+                         na.value = "grey100", 
+                        #trans = "log",
+                        #breaks = my_breaks, labels = my_breaks
+                        )
+```
+
+
 #Limitations
 ```{r}
 unique(AllSierras_DamCapacity$oPBRC_UD)
