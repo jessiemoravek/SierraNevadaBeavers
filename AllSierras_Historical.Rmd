@@ -40,6 +40,8 @@ DamCap_GAP12 <- readRDS("DamCap_GAP12.rds")
 TNC_DamCapacity <- readRDS("TNC_DamCapacity.rds")
 fireRisk <- readRDS("fireRisk.rds")
 tribalLands <- readRDS("tribalLands.rds")
+contFireRisk <- readRDS("contFireRisk.rds")
+
 
 ```
 
@@ -333,49 +335,64 @@ percentleft <- currentstor/historicalstor
 
 volchange <- currentstor-historicalstor
 ```
+
+
+
 #Apply volume to every watershed
 ```{r}
-WatershedBoundaries <- mutate(WatershedBoundaries, ID=row_number())
-watersheds <- st_join(AllSierras_DamCapacity,WatershedBoundaries)
-?st_join
+watersheds <- st_join(WatershedBoundaries,AllSierras_DamCapacity)
+watershedsPoly <- st_intersection(AllSierras_DamCapacity, WatershedBoundaries)
+saveRDS(watershedsPoly,"watershedsPoly.rds")
+saveRDS(watersheds,"watersheds.rds")
 
 test <- watersheds %>%
-    group_by(ID) %>% 
-    summarise(num = n(),
-              totalVol = sum(volume),
+    group_by(geometry) %>% 
+    summarise(totalVol = sum(volume),
               totalVolHist = sum(volumeHist),
               totalVolChange = sum(VolumeChange))
 
-ggplot() +
-    geom_sf(data = watersheds, aes(x = totalVol)) +
-    scale_color_viridis(discrete = FALSE, option = "plasma", na.value = "grey70")+
-    xlab(NULL)+
-    ylab(NULL)+
-    ggtitle(expression(paste("Change in Volume (m3)"))) + 
-    theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5),
-          plot.subtitle = element_text(hjust = 0.5)) 
-
-
-ggplot() + 
-  geom_sf(data = test, fill = test$totalVol) +
-  scale_color_viridis(discrete = FALSE, option = "plasma", na.value = "grey70")+
+totalVol <- ggplot() +
+  geom_sf(data = WatershedBoundaries) +
+  geom_sf(data = test, aes(fill = totalVol), inherit.aes = FALSE) +
+  scale_fill_viridis_c(option = "plasma") + 
   xlab(NULL)+
   ylab(NULL)+
-  ggtitle(expression(paste("Change in Volume (m3)"))) + 
+  ggtitle(expression(paste("Potential Water Storage by Watershed (m3)"))) + 
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5),
-        plot.subtitle = element_text(hjust = 0.5)) 
+          plot.subtitle = element_text(hjust = 0.5)) +
+  theme(panel.border = element_rect(colour = "black", fill=NA))
 
 
-ggplot(test, aes(fill = totalVol)) +
-    geom_sf()+
-    scale_fill_gradientn(colours=rev(magma(6)),
-                         name="Total Volume (m3)",
-                         na.value = "grey100", 
-                        #trans = "log",
-                        #breaks = my_breaks, labels = my_breaks
-                        )
+```
+#Apply Dam Capacity to every watershed
+```{r}
+
+test <- watersheds %>%
+    group_by(geometry) %>% 
+    summarise(totalVol = sum(volume),
+              totalVolHist = sum(volumeHist),
+              totalVolChange = sum(VolumeChange),
+              totalBeavs = sum(mCC_EX_CT ),
+              avgBeavs = mean(oCC_EX))
+
+totalBeavs <- ggplot() +
+  geom_sf(data = WatershedBoundaries) +
+  geom_sf(data = test, aes(fill = totalBeavs), inherit.aes = FALSE) +
+  scale_fill_viridis_c() + 
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("Total dam building capacity (# of dams)"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5))+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+
+```
+
+```{r}
+totalVol + totalBeavs
 ```
 
 
@@ -563,7 +580,7 @@ plot(contFireRisk)
 contFireRisk_df <- as.data.frame(contFireRisk, xy=T)
 ggplot() +
     geom_raster(data = contFireRisk_df , aes(x = x, y = y, fill = Band_1)) +
-    scale_fill_viridis_c() +
+    scale_fill_viridis_c(option = "inferno") +
     coord_quickmap()
 hist(contFireRisk_df$Band_1)
 saveRDS(contFireRisk,"contFireRisk.rds")
