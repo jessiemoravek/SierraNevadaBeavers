@@ -40,8 +40,9 @@ DamCap_GAP12 <- readRDS("DamCap_GAP12.rds")
 TNC_DamCapacity <- readRDS("TNC_DamCapacity.rds")
 fireRisk <- readRDS("fireRisk.rds")
 tribalLands <- readRDS("tribalLands.rds")
-contFireRisk <- readRDS("contFireRisk.rds")
-
+#contFireRisk <- readRDS("contFireRisk.rds")
+watershedsPoly <- readRDS("watershedsPoly.rds")
+#watersheds <- readRDS("watersheds.rds")
 
 ```
 
@@ -341,8 +342,8 @@ volchange <- currentstor-historicalstor
 #Apply volume to every watershed
 ```{r}
 watersheds <- st_join(WatershedBoundaries,AllSierras_DamCapacity)
-watershedsPoly <- st_intersection(AllSierras_DamCapacity, WatershedBoundaries)
-saveRDS(watershedsPoly,"watershedsPoly.rds")
+#watershedsPoly <- st_intersection(AllSierras_DamCapacity, WatershedBoundaries)
+#saveRDS(watershedsPoly,"watershedsPoly.rds")
 saveRDS(watersheds,"watersheds.rds")
 
 test <- watersheds %>%
@@ -357,7 +358,7 @@ totalVol <- ggplot() +
   scale_fill_viridis_c(option = "plasma") + 
   xlab(NULL)+
   ylab(NULL)+
-  ggtitle(expression(paste("Potential Water Storage by Watershed (m3)"))) + 
+  ggtitle(expression(paste("Potential Water Storage (m3)"))) + 
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5),
           plot.subtitle = element_text(hjust = 0.5)) +
@@ -382,7 +383,7 @@ totalBeavs <- ggplot() +
   scale_fill_viridis_c() + 
   xlab(NULL)+
   ylab(NULL)+
-  ggtitle(expression(paste("Total dam building capacity (# of dams)"))) + 
+  ggtitle(expression(paste("Total dam capacity (# of dams)"))) + 
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5),
           plot.subtitle = element_text(hjust = 0.5))+
@@ -394,7 +395,36 @@ totalBeavs <- ggplot() +
 ```{r}
 totalVol + totalBeavs
 ```
+#Watershed summary historical change
+```{r}
 
+test <- watersheds %>%
+    group_by(geometry) %>% 
+    summarise(totalVol = sum(volume),
+              totalVolHist = sum(volumeHist),
+              totalVolChange = sum(VolumeChange),
+              totalBeavs = sum(mCC_EX_CT ),
+              avgBeavs = mean(oCC_EX),
+              histChange = mean(mCC_EXvHPE, na.rm=T))
+
+histChange <- ggplot() +
+  geom_sf(data = WatershedBoundaries) +
+  geom_sf(data = test, aes(fill = histChange), inherit.aes = FALSE) +
+  scale_fill_viridis_c(option = 'cividis') + 
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("Historical Change in Dam Capacity"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5))+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+
+```
+
+```{r}
+histChange + totalBeavs + totalVol
+```
 
 #Limitations
 ```{r}
@@ -572,21 +602,146 @@ f1 + f2
 ```
 #Fire Risk Continuous
 ```{r}
-# Read in the raster (already projected and clipped in ArcPro)
-contFireRisk <- rast("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/FireRisk/FireRisk_Clip.tif")
+# Read in the raster 
+contFireRisk <- rast("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/FireRisk/FireRisk_4.tif")
+plot(contFireRisk)
+contFireRisk <- project(contFireRisk, crs(AllSierras_DamCapacity))
+crs(contFireRisk) == crs(AllSierras_DamCapacity) #== crs(WatershedBoundaries)
+wkt <- crs(contFireRisk)
+# Crop
+contFireRisk <- crop(contFireRisk, WatershedBoundaries)
+contFireRisk <- mask(contFireRisk, WatershedBoundaries)
 plot(contFireRisk)
 
-#visualie
-contFireRisk_df <- as.data.frame(contFireRisk, xy=T)
-ggplot() +
-    geom_raster(data = contFireRisk_df , aes(x = x, y = y, fill = Band_1)) +
-    scale_fill_viridis_c(option = "inferno") +
-    coord_quickmap()
-hist(contFireRisk_df$Band_1)
-saveRDS(contFireRisk,"contFireRisk.rds")
+#visualize
+fr <- ggplot() +
+    geom_spatraster(data = contFireRisk , aes(fill = Band_1)) +
+    scale_fill_viridis_c(option = "inferno",na.value = "transparent") +
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Fire Risk"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5))+
+   theme(panel.border = element_rect(colour = "black", fill=NA))
 
+#save
+saveRDS(contFireRisk,"contFireRisk.rds")
+contFireRisk <- readRDS("contFireRisk.rds")
 #The WHP has continous "fire risk values" that in this area go from 0 to 42223. Those are an index developed to indiccate Wildfire Hazard Potential (WHP). See metadata for more information. 
 #This is a continuous dataset but much like BRAT is often presented as categorical for visualization purposes. 
+```
+
+##intersect ra (practice)
+```{r}
+?extract
+ex <- extract(contFireRisk, AllSierras_DamCapacity, calls = TRUE, xy = TRUE)
+ex2 <- ex[,c(3,4,2)] #reorder for Rast function
+streamFireRisk <- rast(ex2, type = 'xyz')
+crs(streamFireRisk) <- wkt
+
+streamfr <- ggplot() +
+  geom_spatraster(data = streamFireRisk, aes(fill = Band_1)) +
+  scale_fill_viridis_c(option = "inferno",na.value = "transparent") +
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("Fire Risk Intersection with Stream Network"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5))+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+```{r}
+fr + streamfr
+```
+##Fire risk intersection with high quality dam areas
+###pull high quality areas
+```{r}
+highquality <- subset(AllSierras_DamCapacity, oCC_EX >= 10) #pull out good habitat
+
+palette_new <- colorRampPalette(colors = c( "#00FF50", "#4900FF"))(2)
+#scales::show_col(palette_new)
+
+hqDams <- ggplot(transform(highquality, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40), include.lowest=T))) +
+    geom_sf(aes(color = DamCapacity)) +
+    scale_color_manual(values=palette_new)+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("High Quality Beaver Habitat"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+
+###Pull high fire risk pixels
+```{r}
+#Note: Cannot figure out how WHP classifies high and very high fire risk categories based on WHP values. Not included in metadata. For now, choosing top quartile. 
+summary(contFireRisk$Band_1)
+#Top quartile starts at 1095, so let's start at WHP = 3000 as high and very high risk areas (again, FOR NOW) this is conservative
+
+highRisk <- contFireRisk
+highRisk[highRisk[] < 3000] = NA 
+plot(highRisk, zlim = c(0,70), main = "Filtered raster")
+
+highfr <- ggplot() +
+  geom_spatraster(data = highRisk, aes(fill = Band_1)) +
+  scale_fill_viridis_c(option = "inferno",na.value = "transparent") +
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("High Risk Fire Areas"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5))+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+```{r}
+highfr + hqDams
+```
+
+
+```{r}
+
+ggplot() +
+  geom_spatraster(data = highRisk, aes(fill = Band_1)) +
+  geom_sf(data = highquality, color = "#00FF50") +
+  scale_fill_viridis_c(option = "inferno",na.value = "transparent") +
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("High Risk Fire Areas + High Quality Habitat"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5))+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+
+###Extract high risk and high quality overlap
+```{r}
+riskExtract <- extract(highRisk, highquality, xy = TRUE, touches = TRUE)
+riskExtract <- riskExtract[,c(3,4,2)] #reorder for Rast function
+riskExtract <- rast(riskExtract, type = 'xyz')
+crs(riskExtract) <- wkt
+
+hq <- ggplot() +
+  geom_spatraster(data = riskExtract, aes(fill = Band_1)) +
+  scale_fill_viridis_c(option = "inferno",na.value = "transparent") +
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("High Fire Risk and High Dam Capacity"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5))+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+summary(riskExtract)
+hist(riskExtract)
+hist(highRisk)
+
+result <- as.data.frame(riskExtract) %>%
+  summarise(pixels = n()) %>% 
+  mutate(`area m^2` = pixels * 270 * 270, #multiply by pixel area
+         `area km^2` = round(`area m^2`/1e6,2)) 
+#1000 km2 of fire resilience conferred 
 ```
 
 
