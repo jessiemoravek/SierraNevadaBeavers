@@ -27,6 +27,7 @@ library(tigris)
 library(patchwork)
 library(car)
 library(multcomp)
+library(exactextractr)
 ```
 
 #Input Files (all together)
@@ -73,9 +74,9 @@ c <- ggplot() +
     scale_color_manual(values=palette_new)+
     theme_minimal()+
     ggtitle(expression(paste("Current Dam Capacity"))) +
-    theme(plot.title = element_text(hjust = 0.5),
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
-    theme(element_text(size=10),legend.position = c(.15,.2))+
+    #theme(element_text(size=10),legend.position = c(.15,.2))+
     labs(color = "dams/km", size=10)+
     theme(panel.border = element_rect(colour = "black", fill=NA))
 
@@ -88,9 +89,9 @@ h <- ggplot() +
     scale_color_manual(values=palette_new)+
     theme_minimal()+
     ggtitle(expression(paste("Historical Dam Capacity"))) +
-    theme(plot.title = element_text(hjust = 0.5),
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
-    theme(element_text(size=10),legend.position = c(.15,.2))+
+    #theme(element_text(size=10),legend.position = c(.15,.2))+
     labs(color = "dams/km", size=10)+
     theme(panel.border = element_rect(colour = "black", fill=NA))
 
@@ -305,6 +306,19 @@ ggplot() +
     theme(plot.title = element_text(hjust = 0.5),
           plot.subtitle = element_text(hjust = 0.5)) 
 ```
+
+##Current volume map
+```{r}
+currentVol <- ggplot() +
+    geom_sf(data = AllSierras_DamCapacity, aes(color = volume)) +
+    scale_color_viridis(discrete = FALSE, option = "plasma", na.value = "grey70")+
+    xlab(NULL)+
+    ylab(NULL)+
+    ggtitle(expression(paste("Potential Water Storage (m3)"))) + 
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5)) 
+```
 ##Volume Change
 ```{r}
 AllSierras_DamCapacity$VolumeChange <-  AllSierras_DamCapacity$volume - AllSierras_DamCapacity$volumeHist
@@ -344,13 +358,16 @@ volchange <- currentstor-historicalstor
 watersheds <- st_join(WatershedBoundaries,AllSierras_DamCapacity)
 #watershedsPoly <- st_intersection(AllSierras_DamCapacity, WatershedBoundaries)
 #saveRDS(watershedsPoly,"watershedsPoly.rds")
-saveRDS(watersheds,"watersheds.rds")
+#saveRDS(watersheds,"watersheds.rds")
 
 test <- watersheds %>%
     group_by(geometry) %>% 
     summarise(totalVol = sum(volume),
               totalVolHist = sum(volumeHist),
-              totalVolChange = sum(VolumeChange))
+              totalVolChange = sum(VolumeChange),
+              totalBeavs = sum(mCC_EX_CT ),
+              avgBeavs = mean(oCC_EX),
+              histChange = mean(mCC_EXvHPE, na.rm=T))
 
 totalVol <- ggplot() +
   geom_sf(data = WatershedBoundaries) +
@@ -360,7 +377,7 @@ totalVol <- ggplot() +
   ylab(NULL)+
   ggtitle(expression(paste("Potential Water Storage (m3)"))) + 
   theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5),
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
   theme(panel.border = element_rect(colour = "black", fill=NA))
 
@@ -368,24 +385,15 @@ totalVol <- ggplot() +
 ```
 #Apply Dam Capacity to every watershed
 ```{r}
-
-test <- watersheds %>%
-    group_by(geometry) %>% 
-    summarise(totalVol = sum(volume),
-              totalVolHist = sum(volumeHist),
-              totalVolChange = sum(VolumeChange),
-              totalBeavs = sum(mCC_EX_CT ),
-              avgBeavs = mean(oCC_EX))
-
 totalBeavs <- ggplot() +
   geom_sf(data = WatershedBoundaries) +
   geom_sf(data = test, aes(fill = totalBeavs), inherit.aes = FALSE) +
   scale_fill_viridis_c() + 
   xlab(NULL)+
   ylab(NULL)+
-  ggtitle(expression(paste("Total dam capacity (# of dams)"))) + 
+  ggtitle(expression(paste("Total # of Dams"))) + 
   theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5),
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5))+
   theme(panel.border = element_rect(colour = "black", fill=NA))
 
@@ -397,16 +405,6 @@ totalVol + totalBeavs
 ```
 #Watershed summary historical change
 ```{r}
-
-test <- watersheds %>%
-    group_by(geometry) %>% 
-    summarise(totalVol = sum(volume),
-              totalVolHist = sum(volumeHist),
-              totalVolChange = sum(VolumeChange),
-              totalBeavs = sum(mCC_EX_CT ),
-              avgBeavs = mean(oCC_EX),
-              histChange = mean(mCC_EXvHPE, na.rm=T))
-
 histChange <- ggplot() +
   geom_sf(data = WatershedBoundaries) +
   geom_sf(data = test, aes(fill = histChange), inherit.aes = FALSE) +
@@ -415,7 +413,7 @@ histChange <- ggplot() +
   ylab(NULL)+
   ggtitle(expression(paste("Historical Change in Dam Capacity"))) + 
   theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5),
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5))+
   theme(panel.border = element_rect(colour = "black", fill=NA))
 
@@ -621,7 +619,7 @@ fr <- ggplot() +
     ylab(NULL)+
     ggtitle(expression(paste("Fire Risk"))) + 
     theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5),
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5))+
    theme(panel.border = element_rect(colour = "black", fill=NA))
 
@@ -632,7 +630,7 @@ contFireRisk <- readRDS("contFireRisk.rds")
 #This is a continuous dataset but much like BRAT is often presented as categorical for visualization purposes. 
 ```
 
-##intersect ra (practice)
+##extract stream pixels (practice)
 ```{r}
 ?extract
 ex <- extract(contFireRisk, AllSierras_DamCapacity, calls = TRUE, xy = TRUE)
@@ -651,8 +649,12 @@ streamfr <- ggplot() +
           plot.subtitle = element_text(hjust = 0.5))+
   theme(panel.border = element_rect(colour = "black", fill=NA))
 ```
+
+###Map vol, fire risk, current, and historic dam cap
 ```{r}
 fr + streamfr
+
+(h + c) / (currentVol + fr)
 ```
 ##Fire risk intersection with high quality dam areas
 ###pull high quality areas
@@ -742,6 +744,48 @@ result <- as.data.frame(riskExtract) %>%
   mutate(`area m^2` = pixels * 270 * 270, #multiply by pixel area
          `area km^2` = round(`area m^2`/1e6,2)) 
 #1000 km2 of fire resilience conferred 
+```
+
+```{r}
+
+
+```
+
+##Apply to watersheds
+```{r}
+riskExtract_df <- as.data.frame(riskExtract, xy=T)
+watershedBoundaries_df <- as.data.frame(WatershedBoundaries, xy=T)
+fireRiskWatersheds <- terra::merge(WatershedBoundaries, riskExtract_df)
+fireRiskWatersheds <- extract(riskExtract, WatershedBoundaries)
+?merge
+
+?exact_extract
+fireRiskWatersheds3 <- exact_extract(riskExtract, WatershedBoundaries, c("mean","count"))
+
+WatershedBoundaries$npixels <- exact_extract(riskExtract, WatershedBoundaries, 'count')
+WatershedBoundaries$area_m2 <- WatershedBoundaries$npixels*270*270  
+WatershedBoundaries$area_km2 <- round(WatershedBoundaries$area_m2/1e6,2)
+    
+   
+```
+
+
+```{r}
+frw <- ggplot() +
+  geom_sf(data = WatershedBoundaries, aes(fill = area_km2)) +
+  scale_fill_viridis_c(option = 'inferno') + 
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("Fire Resilience (km2)"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5))+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+###Map of four
+```{r}
+(histChange + totalBeavs) / (totalVol + frw)
+
 ```
 
 
