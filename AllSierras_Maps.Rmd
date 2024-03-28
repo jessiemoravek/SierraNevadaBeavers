@@ -32,6 +32,7 @@ library(exactextractr)
 #Input Files (all together)
 ```{r}
 AllSierras_DamCapacity <- readRDS("AllSierras_DamCapacity_volume.rds")
+background <- readRDS("background.rds")
 PADUS <- readRDS("PADUS.rds")
 WatershedBoundaries <- readRDS("WatershedBoundaries.rds")
 PADUS_clip <- readRDS("PADUS_clip.rds")
@@ -45,17 +46,35 @@ watershedsPoly <- readRDS("watershedsPoly.rds")
 
 ```
 
+##Background
+```{r eval=FALSE, include=FALSE}
+background <- states(cb = FALSE)
+
+background <- st_make_valid(background) %>%
+  dplyr::mutate(valid =st_is_valid(background)) %>% 
+  dplyr::filter(valid=="TRUE") 
+#^Millie's validation code...use later
+
+background <- background %>% filter(NAME == "California" | NAME == "Nevada")
+background <- st_transform(background, 3310)
+box <- st_bbox(AllSierras_DamCapacity)
+background_crop <- st_crop(background, box)
+
+saveRDS(background,"background.rds")
+```
+
+
 ##Watershed Boundaries Map
 ```{r}
 palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
 
 w <- ggplot() +
-    #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, fill = "#b0b0b0", lwd = 0.1, alpha = 0.5 ) +
     scale_color_manual(values=palette_new)+
     theme_minimal()+
     ggtitle(expression(paste("Watershed Boundaries"))) +
-    theme(plot.title = element_text(hjust = 0.5),
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
     #theme(element_text(size=10),legend.position = c(.15,.2))+
     #labs(color = "dams/km", size=10)+
@@ -109,12 +128,13 @@ AllSierras_DamCapacity$mCC_EXvHPE[!is.finite(AllSierras_DamCapacity$mCC_EXvHPE)]
 r <- ggplot() +
     #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(mCC_EXvHPE, breaks = c(0,.25,.5,.75,1,70), include.lowest=T)),aes(color = DamCapacity)) +
+    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
     scale_color_manual(values=palette_new)+
     theme_minimal()+
     ggtitle(expression(paste("Percent Dam Capacity Remaining"))) +
-    theme(plot.title = element_text(hjust = 0.5),
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
-    theme(element_text(size=10),legend.position = c(.15,.2))+
+    #theme(element_text(size=10),legend.position = c(.15,.2))+
     labs(color = "dams/km", size=10)+
     theme(panel.border = element_rect(colour = "black", fill=NA))
 
@@ -132,12 +152,14 @@ AllSierras_DamCapacity$VegChange100 <-  AllSierras_DamCapacity$iVeg100EX - AllSi
 veg <- ggplot() +
     geom_sf(data = AllSierras_DamCapacity, aes(color = VegChange100)) +
     scale_color_gradient2(low = "red", mid = "white", high = "blue", midpoint = 0, na.value = "grey70")+
+    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
     xlab(NULL)+
     ylab(NULL)+
     ggtitle(expression(paste("Vegetation Change"))) + 
     theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5),
-          plot.subtitle = element_text(hjust = 0.5)) 
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5))+
+    theme(panel.border = element_rect(colour = "black", fill=NA)) 
 ```
 
 #Change in volume
@@ -171,7 +193,8 @@ hmap <- ggplot() +
     ggtitle(expression(paste("Potential Water Storage (m3)"))) + 
     theme_minimal() +
     theme(plot.title = element_text(hjust = 0.5),
-          plot.subtitle = element_text(hjust = 0.5)) 
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(panel.border = element_rect(colour = "black", fill=NA))
 ```
 
 ##Current volume map
@@ -196,13 +219,26 @@ AllSierras_DamCapacity$VolumeChange <-  AllSierras_DamCapacity$volume - AllSierr
 vol <- ggplot() +
     geom_sf(data = AllSierras_DamCapacity, aes(color = VolumeChange)) +
     scale_color_gradient2(low = "red", mid = "grey70", high = "blue", midpoint = 0, na.value = "grey70")+
+    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
     xlab(NULL)+
     ylab(NULL)+
     ggtitle(expression(paste("Change in Volume (m3)"))) + 
     theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5),
-          plot.subtitle = element_text(hjust = 0.5)) 
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(panel.border = element_rect(colour = "black", fill=NA))
 ```
+###Map of watersheds + veg + volume
+```{r eval=FALSE, include=FALSE}
+layout <- "
+AB
+C#
+"
+
+r + veg + vol + 
+  plot_layout(design = layout)
+```
+
 
 ##Normalizing volume
 ```{r}
@@ -321,6 +357,20 @@ fr <- ggplot() +
 #The WHP has continous "fire risk values" that in this area go from 0 to 42223. Those are an index developed to indiccate Wildfire Hazard Potential (WHP). See metadata for more information. 
 #This is a continuous dataset but much like BRAT is often presented as categorical for visualization purposes. 
 ```
+##Fire risk vs. dam capacity
+```{r}
+contFireRisk$Band_1
+contFireRisk_df <- as_data_frame(contFireRisk, xy=T)
+summary(contFireRisk_df$Band_1)
+
+summary(AllSierras_DamCapacity$oCC_EX)
+
+fireDamExtract <- extract(contFireRisk, AllSierras_DamCapacity, xy = TRUE, touches = TRUE)
+AllSierras_DamCapacity$fireRisk <- extract(contFireRisk, AllSierras_DamCapacity, xy = TRUE, touches = TRUE)
+
+
+```
+
 
 ##Fire risk intersection with high quality dam areas
 ###pull high quality areas
@@ -392,6 +442,7 @@ result <- as.data.frame(riskExtract) %>%
 #1365 km2 of fire resilience conferred 
 ```
 
+#Watershed-Grouped Figures
 ##Apply to watersheds
 ```{r}
 WatershedBoundaries$npixels <- exact_extract(riskExtract, WatershedBoundaries, 'count')
@@ -413,16 +464,50 @@ frw <- ggplot() +
 ```
 
 ###Map vol, fire risk, current, and historic dam cap
-```{r}
+```{r eval=FALSE, include=FALSE}
 (h + c) / (currentVol + fr)
 ```
 
 ###Map grouped by watershed
-```{r}
+```{r eval=FALSE, include=FALSE}
 (histChange + avgBeavs) / (totalVol + frw)
 ```
+
+##Watershed-grouped table
+```{r}
+test <- watersheds %>%
+    group_by(geometry) %>% 
+    summarise(normVol = mean(VolumePerKm),
+              totalVol = sum(volume),
+              totalVolHist = sum(volumeHist),
+              totalVolChange = sum(VolumeChange),
+              totalBeavs = sum(mCC_EX_CT),
+              avgBeavs = mean(oCC_EX),
+              histBeavs = mean(oCC_HPE),
+              histChange = mean(mCC_EXvHPE, na.rm=T))
+
+test$npixels <- exact_extract(riskExtract, test, 'count')
+test$area_m2 <- test$npixels*270*270  
+test$area_km2 <- round(test$area_m2/1e6,2)
+?rename
+test_df <-as_data_frame(test, xy = T)
+
+table1 <- test_df %>%
+  dplyr::select(geometry, histBeavs, avgBeavs, histChange, totalVol, area_km2) %>%  
+  dplyr:: rename(`Historical mean dam capacity (dams/km)` = histBeavs, 
+                 `Current mean dam capacity (dams/km)` = avgBeavs, 
+                 `Percent dam capacity remaining (%)` = histChange, 
+                 `Total potential water storage (m3)` = totalVol, 
+                 `Total area of potential fire resilience in high-risk fire areas (km2)` = area_km2)
+
+st_as_sf(table1)
+st_write(table1, "table1.shp")
+```
+
+
+
 #Bivariate Colorpleth Map
-##Put potential water stor into raster
+##Put potential water storage into raster
 ```{r}
 #convert to spatVector object
 sv_AllSierras <- terra::vect(AllSierras_DamCapacity)
@@ -453,8 +538,8 @@ writeRaster(volumeR, "waterStorage.tif", overwrite=T)
 ```{r}
 # The function that produces the colour matrix
 colmat <- function(nbreaks = 3, breakstyle = "quantile",
-                   upperleft = "#0096EB", upperright = "#820050", 
-                   bottomleft = "#BEBEBE", bottomright = "#FFE60F",
+                   upperleft = "#64ACBE", upperright = "#574249", 
+                   bottomleft = "#E8E8E8", bottomright = "#C85A5A",
                    xlab = "x label", ylab = "y label", plotLeg = TRUE,
                    saveLeg = FALSE) {
    # TODO - replace any tidyr, dplyr etc. functions with data.table #
@@ -616,12 +701,102 @@ bivariate.map <- function(rasterx, rastery, colourmatrix = col.matrix,
     cols[i] <- as.numeric(col.matrix2[b, a])
   }
   r <- rasterx
-  #r[1:length(r)] <- cols
+  r[] <- cols
   return(r)
 }
 
-
 ```
+
+
+
+```{r eval=FALSE, include=FALSE}
+bivariate.map <- function(rasterx, rastery, colourmatrix = col.matrix,
+                          export.colour.matrix = TRUE,
+                          outname = paste0("colMatrix_rasValues", names(rasterx))) {
+  # TO DO - replace raster with terra #
+  #require(raster)
+  require(classInt)
+  
+export.colour.matrix = TRUE  
+colourmatrix = col.matrixQ  
+rasterx <- fireResilienceAll
+rastery <- waterStorage
+outname= "test"
+  # export.colour.matrix will export a data.frame of rastervalues and RGB codes 
+  # to the global environment outname defines the name of the data.frame
+  quanx <- values(rasterx)
+  tempx <- data.frame(quanx, quantile = rep(NA, length(quanx)))
+  brks <- with(tempx, classIntervals(quanx,
+                                    n = attr(colourmatrix, "nbreaks"),
+                                    style = attr(colourmatrix, "breakstyle"))$brks)
+  ## Add (very) small amount of noise to all but the first break
+  ## https://stackoverflow.com/a/19846365/1710632
+  brks[-1] <- brks[-1] + seq_along(brks[-1]) * .Machine$double.eps
+  r1 <- within(tempx, quantile <- cut(quanx,
+                                     breaks = brks,
+                                     labels = 2:length(brks),
+                                     include.lowest = TRUE))
+  quantr <- data.frame(r1[, 2])
+  quany <- values(rastery)
+  tempy <- data.frame(quany, quantile = rep(NA, length(quany)))
+  brksy <- with(tempy, classIntervals(quany,
+                                     n = attr(colourmatrix, "nbreaks"),
+                                     style = attr(colourmatrix, "breakstyle"))$brks)
+  brksy[-1] <- brksy[-1] + seq_along(brksy[-1]) * .Machine$double.eps
+  r2 <- within(tempy, quantile <- cut(quany,
+                                     breaks = brksy,
+                                     labels = 2:length(brksy),
+                                     include.lowest = TRUE
+  ))
+  quantr2 <- data.frame(r2[, 2])
+  as.numeric.factor <- function(x) {
+    as.numeric(levels(x))[x]
+  }
+  col.matrix2 <- colourmatrix
+  cn <- unique(colourmatrix)
+  for (i in 1:length(col.matrix2)) {
+    ifelse(is.na(col.matrix2[i]),
+           col.matrix2[i] <- 1, col.matrix2[i] <- which(
+             col.matrix2[i] == cn
+           )[1]
+    )
+  }
+  # Export the colour.matrix to data.frame() in the global env
+  # Can then save with write.table() and use in ArcMap/QGIS
+  # Need to save the output raster as integer data-type
+  if (export.colour.matrix) {
+    # create a dataframe of colours corresponding to raster values
+    exportCols <- as.data.frame(cbind(
+      as.vector(col.matrix2), as.vector(colourmatrix),
+      t(col2rgb(as.vector(colourmatrix)))
+    ))
+    # rename columns of data.frame()
+    colnames(exportCols)[1:2] <- c("rasValue", "HEX")
+    # Export to the global environment
+    assign(
+      x = outname,
+      value = exportCols,
+      pos = .GlobalEnv
+    )
+  }
+  cols <- numeric(length(quantr[, 1]))
+  for (i in 1:length(quantr[, 1])) {
+    a <- as.numeric.factor(quantr[i, 1])
+    b <- as.numeric.factor(quantr2[i, 1])
+    cols[i] <- as.numeric(col.matrix2[b, a])
+  }
+  r <- rasterx
+  r[1:length(r)] <- cols
+  return(r)
+}
+
+str(cols)
+length(cols) 
+dim(rasterx)
+2536*1476 == length(cols)
+```
+
+
 
 
 ##Read in your data
@@ -629,7 +804,7 @@ bivariate.map <- function(rasterx, rastery, colourmatrix = col.matrix,
 #read in your data 
  
 fireResilience <- rast("fireResilience.tif")
-fireResilience[is.na(fireResilience[])] <- 0
+#fireResilience[is.na(fireResilience[])] <- 0
 waterStorage <- rast("waterStorage.tif")
 r <- c(fireResilience, waterStorage)
 names(r) <- c("fireResilience","waterStorage")
@@ -637,7 +812,7 @@ names(r) <- c("fireResilience","waterStorage")
 ```
 
 ```{r}
-volumeR[(volumeR[] == 0)] <- NA
+#volumeR[(volumeR[] == 0)] <- NA
 
 vras <- ggplot() +
   geom_spatraster(data = volumeR, aes(fill = volume)) +
@@ -667,26 +842,113 @@ vras + fras
 ```
 
 ```{r cache=TRUE}
-library(raster)
-
 # Define the number of breaks
 nBreaks <- 4
 
 # Create the colour matrix
 col.matrixQ <- colmat(nbreaks = nBreaks, breakstyle = "quantile",
-                       xlab = "Fire Resilience", ylab = "Water Storage", 
-                       bottomright = "#77ac59", upperright = "#355149",
-                       bottomleft = "#d3d3d3", upperleft = "#5e63ae",
+                       xlab = "Fire", ylab = "Water", 
+                       bottomright = "#C85A5A", upperright = "#574249",
+                       bottomleft = "#E8E8E8", upperleft = "#64ACBE",
                        saveLeg = FALSE, plotLeg = TRUE)
 
 
 # create the bivariate raster
-if (!file.exists("bivmapQ.tif")) {
-  bivmapQ <- bivariate.map(rasterx = r[["fireResilience"]], rastery = r[["waterStorage"]],
+if (!file.exists("bivmapQ_pull.tif")) {
+  bivmapQ_pull <- bivariate.map(rasterx = r[["fireResilience"]], rastery = r[["waterStorage"]],
                           export.colour.matrix = TRUE,
                           colourmatrix = col.matrixQ)
-  writeRaster(bivmapQ, "bivmapQ.tif")
+  writeRaster(bivmapQ_pull, "bivmapQ_pull.tif")
 }
+bivmapQ_pull <- rast("bivmapQ_pull.tif")
+
+# Convert to dataframe for plotting with ggplot
+library(data.table)
+bivmapQ_pullDFQ <- setDT(as.data.frame(bivmapQ_pull, xy = TRUE))
+colnames(bivMapDFQ)[3] <- "BivValue"
+bivmapQ_pullDFQ <- melt(bivmapQ_pullDFQ, id.vars = c("x", "y"),
+                   measure.vars = "BivValue",
+                   value.name = "bivVal",
+                   variable.name = "Variable")
+
+# Make the map using ggplot
+map_q2 <- ggplot() +
+    geom_raster(data = bivmapQ_pullDFQ, aes(x = x, y = y, fill = bivVal)) +
+      scale_fill_gradientn(colours = col.matrixQ, na.value = "transparent") + 
+    theme_classic() + theme(panel.grid.major = element_blank(),
+                            panel.grid.minor = element_blank()) +
+    theme(text = element_text(size = 10, colour = "black")) +
+    borders(colour = "black", size = 0.1) +
+    coord_quickmap() +
+    theme(legend.position = "none",
+          plot.background = element_blank(),
+          strip.text = element_blank(), 
+          #axis.text.y = element_blank(),
+          #axis.text = element_blank(),
+          axis.title = element_blank())
+
+map_q2 <- map_q2 + inset_element(BivLegend, 0, 0, 0.2, 0.3)
+```
+##Try map again using full fire risk raster
+##Put potential water storage into raster
+```{r}
+#convert to spatVector object
+sv_AllSierras <- terra::vect(AllSierras_DamCapacity)
+
+#Create empty raster called "er"
+er <- rast(ext(contFireRisk), resolution=res(contFireRisk)) 
+crs(er) <- crs(contFireRisk)
+
+#Use rasterize function in terra to put volume column into a raster
+nr <- terra::rasterize(sv_AllSierras, er, field= "volume", fun = "sum", touches = TRUE, update = TRUE)
+plot(nr)
+
+volumeR <- nr
+saveRDS(volumeR, "volumeR.rds")
+
+#Make sure fire risk (riskExtract) is on same raster scale as volume
+fireResilience <- extend(riskExtract, contFireRisk)
+
+#Save as .tif files
+writeRaster(fireResilience, "fireResilience.tif", overwrite=T)
+writeRaster(volumeR, "waterStorage.tif", overwrite=T)
+writeRaster(contFireRisk, "fireResilienceAll.tif", overwrite=T)
+```
+
+##Read in your data
+```{r}
+#read in your data 
+ 
+fireResilienceAll <- rast("fireResilienceAll.tif")
+#fireResilience[is.na(fireResilience[])] <- 0
+waterStorage <- rast("waterStorage.tif")
+r <- c(fireResilienceAll, waterStorage)
+names(r) <- c("fireResilienceAll","waterStorage")
+
+
+plot(fireResilience2)
+plot(waterStorage)
+```
+##HELL YES IT WORKED
+```{r cache=TRUE}
+# Define the number of breaks
+nBreaks <- 4
+
+# Create the colour matrix
+col.matrixQ <- colmat(nbreaks = nBreaks, breakstyle = "quantile",
+                       xlab = "Fire", ylab = "Water", 
+                      bottomright = "#C85A5A", upperright = "#574249",
+                       bottomleft = "#E8E8E8", upperleft = "#64ACBE",
+                       saveLeg = FALSE, plotLeg = TRUE)
+
+
+# create the bivariate raster
+#if (!file.exists("bivmapQ.tif")) {
+  bivmapQ <- bivariate.map(rasterx = r[["fireResilienceAll"]], rastery = r[["waterStorage"]],
+                          export.colour.matrix = TRUE,
+                          colourmatrix = col.matrixQ)
+  writeRaster(bivmapQ, "bivmapQ.tif", overwrite = T)
+#}
 bivmapQ <- rast("bivmapQ.tif")
 
 # Convert to dataframe for plotting with ggplot
@@ -702,6 +964,7 @@ bivMapDFQ <- melt(bivMapDFQ, id.vars = c("x", "y"),
 map_q <- ggplot() +
     geom_raster(data = bivMapDFQ, aes(x = x, y = y, fill = bivVal)) +
       scale_fill_gradientn(colours = col.matrixQ, na.value = "transparent") + 
+    #geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
     theme_classic() + theme(panel.grid.major = element_blank(),
                             panel.grid.minor = element_blank()) +
     theme(text = element_text(size = 10, colour = "black")) +
@@ -716,10 +979,30 @@ map_q <- ggplot() +
 
 map_q <- map_q + inset_element(BivLegend, 0, 0, 0.2, 0.3)
 ```
+#Bivariate color map
+```{r}
+watershed_fire_map = private_data %>%
+  mutate(color = ifelse(rel_richness>0 & rel_carbon>0,"both",
+                       ifelse(rel_richness<0 & rel_carbon>0,"carbon",
+                              ifelse(rel_richness>0 & rel_carbon<0,"biodiv","neither"))))
 
+  
 
+subnational_private_map <- subnational_private_map %>%
+  left_join(background_shp)
 
-
-
+subnational_private_main <- ggplot() +
+  geom_sf(data = subnational_private_map, mapping = aes(fill = color, geometry= geometry), color = "black", size = 0.1, show.legend = FALSE) +
+  coord_sf(crs = st_crs(2163), xlim = c(-2350000, 3000000), ylim = c(-2300000, 
+         730000))+ theme_minimal() +
+  theme(panel.border = element_rect(colour = "black", fill=NA)) +
+  scale_fill_manual(values = c("#5e63ae", 
+                               "#355149",
+                               "#77ac59",
+                               "#d3d3d3")) +
+  theme_minimal() +
+  theme(axis.text = element_blank(),
+        panel.grid.major = element_blank())
+```
 
 
