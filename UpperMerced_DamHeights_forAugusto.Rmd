@@ -1,0 +1,269 @@
+---
+title: "UpperMerced_DamHeights_ForAugusto"
+output: html_document
+date: "2024-04-01"
+---
+```{r include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(dataRetrieval)
+library(ggsn)
+library(sf)
+library(maps)
+library(sp)
+library(ncdf4)
+library(sf)
+library(sp)
+library(lwgeom)
+library(terra)
+library(raster) #old version of terra, here just in case but will delete
+library(mapview)
+library(tidyterra)
+library(stars)
+```
+
+##Prep Work
+###Projection
+```{r}
+#Projection is from LIS inputs file 
+wkt <- 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AXIS["Latitude",NORTH],AXIS["Longitude",EAST],AUTHORITY["EPSG","4326"]]'
+```
+
+###Dam Capacity
+```{r}
+# Read in the shapefile with st_read()
+#damCapacity2 <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/DamCapacity2.shp")
+
+#remove unneeded shapefiles
+#file.remove(list.files(pattern = "damCapacity2*",recursive = F))
+
+# Read in shapefile from previously imported shapefile
+damCapacity2 <- readRDS("damCapacity2")
+
+#Project to wkt (NASA projection)
+damCapacity2 <- st_transform(damCapacity2, wkt)
+#saveRDS(damCapacity2,"damCapacity2")
+```
+
+###Pull out endpoints and convert to .txt file
+```{r}
+damCapacity2 #15710 features = 15710 points 
+
+#extract centroid of line segments
+damCapacity2_centroid <- st_centroid(damCapacity2) 
+
+#extract coordinates and relevant rows
+damCapacity2_extract <- damCapacity2_centroid %>%
+  dplyr::mutate(lon = sf::st_coordinates(.)[,1],
+                lat = sf::st_coordinates(.)[,2]) %>%
+  select(lon, lat, oCC_EX) %>%
+  st_drop_geometry()
+
+#Check what it looks like
+ggplot()+
+  geom_sf(data = damCapacity2_extract) #Thumbs up looks good 
+
+#save as .txt
+write.table(damCapacity2_extract,"damCapacity_centroid.txt",sep="\t",row.names=FALSE, col.names=TRUE)
+
+```
+
+
+###Make  1x1km grid
+```{r}
+#Make an extent based on coordinates used to create the LIS input file
+xmin <- -120.985
+xmax <- -119.255
+ymin <- 37.325
+ymax <- 37.925
+extent <- extent(xmin, xmax, ymin, ymax)
+
+#Make a bounding box in the correct projection
+study_area <- st_bbox(extent, crs = st_crs(wkt))
+
+#Is wkt in metric or lat/long coordinate system? st_is_longlat gives TRUE, so it is NOT in metric. This means making a grid is slightly less straightforward. 
+st_is_longlat(study_area)
+
+#Make a grid of the correct size
+study_area = st_make_grid(study_area, n = c(174,63)) #Got these grid dimensions from the spinup run using the "extent" coordinates, so this exactly matches the dimensions of the nc file from LIS
+
+#Convert to an sf dataframe for future manipulation
+study_area = st_as_sf(study_area)
+
+#Add an ID column
+study_area$id = 1:nrow(study_area)
+```
+
+
+###Volume calculation
+```{r}
+damCapacity2_v <- damCapacity2 #Creating a new object to add to (so I don't mess up the original)
+
+for (i in damCapacity2_v){ #for each 300m stream segment in the BRAT model output shapefile
+  damCt <- damCapacity2_v$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length, # of beaver dams is the column mCC_EX_CT in the attribute table)
+  slope <- damCapacity2_v$iGeo_Slope #meters, calculated from the DEM inputs to the BRAT model
+  da <- damCapacity2_v$iGeo_DA #m2, calculated from the DEM and stream network inputs to the BRAT model
+  width <- ifelse(da < 4.95,2.18*(da)^0.191,
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022; using regional regressional equations for width from Wilkerson et al. 2014
+  height <- 1 #assume all beaver dams are 1m tall
+  length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
+  maxLength<- (damCapacity2_v$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that the ponds all run together
+  volume <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt)) #volume of triangular prism
+  damCapacity2_v$width <- width
+  damCapacity2_v$volume <- volume #m3
+} 
+
+```
+
+###Volume by grid cell
+```{r}
+#Aggregate volume by 1x1km grid cell
+#takes a long time to run 
+intersection <- st_intersection(study_area, damCapacity2_v) %>% 
+  mutate(length = st_length(.)) %>% #creates a "length" column that is the length of that particular segment in the grid cell from the "id" column
+  st_drop_geometry() # complicates things in joins later on
+
+#Join with the intersected dam capacity 
+study_area <- study_area %>% 
+  left_join(intersection, by = "id")
+
+#Calculate volume by grid cell based on the percent of each stream segment that is in each grid cell
+vol_by_grid <- study_area %>% 
+  mutate(percent_len_in_cell = length/iGeo_Len) %>% 
+  mutate(segment_vol_in_cell = percent_len_in_cell*volume) %>% 
+  group_by(id) %>% summarize(total_vol_in_cell = sum(segment_vol_in_cell))
+
+#Convert the volume column to numeric
+vol_by_grid$total_vol_in_cell <- as.numeric(vol_by_grid$total_vol_in_cell) #convert volume col to numeric
+
+saveRDS(vol_by_grid,"vol_by_grid.rds")
+vol_by_grid <- readRDS("vol_by_grid.rds")
+
+
+#Note: You will get the following warning because the projection used by LIS is NOT a metric projection:
+#[Output truncated]Spherical geometry (s2) switched off
+#although coordinates are longitude/latitude, st_intersection
+#assumes that they are planar
+#Warning: attribute variables are assumed to be spatially constant throughout all geometriesalthough coordinates are longitude/latitude, st_union assumes
+#that they are planar
+```
+
+##Import data
+###Convert volumes by grid to a raster 
+```{r}
+rvol <- rast(study_area, ncols = 174, nrows = 63)
+values(rvol) <- vol_by_grid$total_vol_in_cell 
+plot(rvol,1, colNA="grey70") #hmm upside down when we rasterize. R doesn't handle rasters well.
+#the raster is upside down so I flipped it. 
+rvol  <- flip(rvol, direction="vertical")
+plot(rvol,1, colNA="grey70", main = "Dam Water Storage (m3)")
+```
+###Load Lis inputs 
+```{r}
+#lis inputs
+inputs <- nc_open("lis_input_berkeley.nc")
+```
+
+###Pre-process LIS inputs so they make sense
+```{r}
+#Get latitude and longitude with the ncvar_get function and store each into their own object:
+lat <- ncvar_get(inputs, "lat")
+nlat <- dim(lat) #to check it matches the metadata: 63
+lon <- ncvar_get(inputs, "lon")
+nlon <- dim(lon) #check, should be 174
+# Check your lat lon dimensions match the information in the metadata we explored before:
+print(c(nlon, nlat))
+
+#Lat and Lon are both stored as two dimensional data arrays. Let's select just the unique lats and longs from those arrays: 
+lat <- lat[1,]
+lon <- lon[,1]
+```
+
+###Transpose inputs
+```{r}
+#The purpose of this code is to use the beaver dam volumes (the rvol raster from above) along with riverbed geometry (river height, width, length, floodplain height) for each grid cell to back-calculate the height a beaver dam would need to be to store the  appropriate volume of water. Then we gotta add that height to elevation to get total elevation of dam above sea level. 
+
+#First, I pull arrays for individual variables from the netcdf file: 
+HYMAP_grid_area <- ncvar_get(inputs, "HYMAP_grid_area")
+HYMAP_floodplain_height <- ncvar_get(inputs, "HYMAP_floodplain_height")
+HYMAP_river_width <- ncvar_get(inputs, "HYMAP_river_width")
+HYMAP_river_length <- ncvar_get(inputs, "HYMAP_river_length")
+HYMAP_river_height <- ncvar_get(inputs, "HYMAP_river_height")
+elevation <- ncvar_get(inputs, "HYMAP_grid_elevation")
+
+############
+#In R these come out UPSIDE DOWN and BACKWARDS. THIS IS ANNOYING. 
+############
+
+#Transpose them:
+HYMAP_grid_area_t <- t(HYMAP_grid_area)
+HYMAP_floodplain_height_t <- aperm(HYMAP_floodplain_height, c(2,1,3)) #transposing 3D matrix
+HYMAP_river_width_t <- t(HYMAP_river_width)
+HYMAP_river_length_t <- t(HYMAP_river_length)
+HYMAP_river_height_t <- t(HYMAP_river_height)
+elevation_t <- t(elevation)
+
+#Next, I rename my raster and convert to a matrix: 
+damvol <- rvol
+damvol.df <- as.matrix(t(raster(damvol)), xy=T) #Converted  raster to a matrix
+damvol.dft <- t(damvol.df)
+dim(damvol.dft)
+str(damvol.dft)
+```
+
+##Make empty matrices to fill
+```{r}
+#make some empty matrices to fill in the for loop 
+damheightsasl_array_t <- matrix(NA_real_, 63, 174) #Dam height + elevation asl
+damheightasl_riverheight_array_t <- matrix(NA_real_, 63, 174) # Dam height + elevation asl + river depth
+floodheight_array_t <- matrix(NA_real_, 63, 174) # Dam height 
+
+#Made some intermediate matrices so I can check outputs
+floodvol_array_t <- matrix(NA_real_, 63, 174) # Floodplain volume 
+rivervol_array_t <- matrix(NA_real_, 63, 174) # River volume 
+```
+
+
+##Calculate Dam Heights
+```{r}
+for (i in 1:length(lat)){ #iterate over every longitude
+  for (j in 1:length(lon)){ #iterate over every latitude
+    damvol_val = damvol.dft[i,j] #Using the matrix of dam volumes
+    rivervol = HYMAP_river_width_t[i,j] * HYMAP_river_length_t[i,j] * HYMAP_river_height_t[i,j] #calculate the volume of the river in that particular cell (width*length*height)
+    floodvol = damvol_val + rivervol #calculate the volume of water left in the floodplain                
+    area = HYMAP_grid_area_t[i,j] #pull in area
+    height = HYMAP_floodplain_height_t[i,j,] #pull in floodplain height, which is a 3 dim variable 
+    volume = area * height #floodplane volume 
+    model = lm(volume ~ height) #make a linear model
+    m = coef(model)[2]
+    b = coef(model)[1]
+    floodheight = (floodvol-b)/m #back calculate floodplain height
+    floodheight[floodheight<0] = 0 #get rid of negative values which don't make physical sense
+    damheightsasl_array_t[i,j] = floodheight + elevation_t[i,j] #add to the elevation variable 
+    damheightasl_riverheight_array_t[i,j] = floodheight = elevation_t[i,j] + HYMAP_river_height_t[i,j]
+    floodheight_array_t[i,j] = floodheight
+    floodvol_array_t[i,j] = floodvol
+    rivervol_array_t[i,j] = rivervol
+    
+ }} 
+```
+
+###Viewing all the outputs
+```{r}
+#Converting things back to a raster for viewing purposes 
+damheight_t <- rast(damheightsasl_array_t)
+terra::set.ext(x = damheight_t, value = extent)
+terra::set.crs(damheight_t,wkt)
+mapview(damheight_t)
+
+floodheight_r <- rast(floodheight_array_t)
+terra::set.ext(x = floodheight_r, value = e)
+terra::set.crs(floodheight_r,wkt)
+mapview(floodheight_r)
+
+elevation_r <- rast(elevation_t)
+terra::set.ext(x = elevation_r, value = e)
+terra::set.crs(elevation_r,wkt)
+mapview(elevation_r)
+```
