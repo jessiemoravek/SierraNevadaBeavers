@@ -27,6 +27,7 @@ library(patchwork)
 library(car)
 library(multcomp)
 library(exactextractr)
+library(scales)
 ```
 
 #Input Files (all together)
@@ -288,6 +289,18 @@ totalVol <- ggplot() +
           plot.subtitle = element_text(hjust = 0.5)) +
   theme(panel.border = element_rect(colour = "black", fill=NA))
 
+normVol <- ggplot() +
+  geom_sf(data = WatershedBoundaries) +
+  geom_sf(data = test, aes(fill = normVol), inherit.aes = FALSE) +
+  scale_fill_viridis_c(option = "plasma") + 
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("Normalized Potential Water Storage \n(m3/km)"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5)) +
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
 
 ```
 
@@ -448,6 +461,8 @@ result <- as.data.frame(riskExtract) %>%
 WatershedBoundaries$npixels <- exact_extract(riskExtract, WatershedBoundaries, 'count')
 WatershedBoundaries$area_m2 <- WatershedBoundaries$npixels*270*270  
 WatershedBoundaries$area_km2 <- round(WatershedBoundaries$area_m2/1e6,2)
+WatershedBoundaries$total_area <- as.numeric(st_area(WatershedBoundaries))
+WatershedBoundaries$firerisk_normalized <- WatershedBoundaries$area_m2 / WatershedBoundaries$total_area
 ```
 
 ```{r}
@@ -463,6 +478,20 @@ frw <- ggplot() +
   theme(panel.border = element_rect(colour = "black", fill=NA))
 ```
 
+```{r}
+frw_n <- ggplot() +
+  geom_sf(data = WatershedBoundaries, aes(fill = firerisk_normalized)) +
+  scale_fill_viridis_c(option = 'inferno') + 
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("Normalized Fire Resilience \n(% total area)"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5))+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+
+
 ###Map vol, fire risk, current, and historic dam cap
 ```{r eval=FALSE, include=FALSE}
 (h + c) / (currentVol + fr)
@@ -472,6 +501,11 @@ frw <- ggplot() +
 ```{r eval=FALSE, include=FALSE}
 (histChange + avgBeavs) / (totalVol + frw)
 ```
+
+```{r}
+normVol + frw_n
+```
+
 
 ##Watershed-grouped table
 ```{r}
@@ -1078,21 +1112,66 @@ map_q <- ggplot() +
 map_q <- map_q + inset_element(BivLegend, 0, 0, 0.2, 0.3)
 
 ```
+#Color matrix by watershed
+##Make a 2x2 color matrix for vis purposes
+```{r}
+# Define the number of breaks
+nBreaks2 <- 2
+
+# Create the colour matrix
+col.matrixQ2 <- colmat(nbreaks = nBreaks2, breakstyle = "quantile",
+                       xlab = "Fire", ylab = "Water", 
+                      bottomright = "#C85A5A", upperright = "#574249",
+                       bottomleft = "#E8E8E8", upperleft = "#64ACBE",
+                       saveLeg = FALSE, plotLeg = TRUE)
+
+palette_biv2 <- colorRampPalette(colors = c("#574249", "#C85A5A", "#E8E8E8", "#C85A5A"))(4)
+```
+
+##New matrix
 ```{r}
 colMatrix_rasValuesfireResilienceAll %>%
   distinct(rasValue, HEX)
 
-
-library(scales)
 show_col(colMatrix_rasValuesfireResilienceAll$HEX)
+#HOOK UP THE COLOR WITH THE  HEX CODE and the  raster number 
 
-#HOOK UP THE COLOR WITH THE FREAKING HEX DCODE and the goddman rastern umber goddammit
-
+#select for a 2x2 color panel for visualizing
 bivmap_simple = bivmapQ %>% 
-  mutate(color = ifelse(fireResilienceAll < 4,"neither",
-                       ifelse(fireResilienceAll > 4 & fireResilienceAll >0,"carbon",
-                              ifelse(rel_richness>0 & rel_carbon<0,"biodiv","neither"))))
+  mutate(color = ifelse(fireResilienceAll %in% c(1,2,9,10),"neither",
+                       ifelse(fireResilienceAll %in% c(3,4,11,12),"water",
+                              ifelse(fireResilienceAll %in% c(13,14,17,18),"fire","both"))))
+#check and see what it looks like
+plot(bivmap_simple$color)
+unique(bivmap_simple$color)
+#1	both			
+#2	fire			
+#3	neither			
+#4	water
+
+#hook up to watershed boundaries to aggregate by watershed
+WatershedBoundaries$bivmap <- exact_extract(bivmap_simple$color, WatershedBoundaries, 'frac')
+WatershedBoundaries$bivmap_mode <- exact_extract(bivmap_simple$color, WatershedBoundaries, 'mode')
+WatershedBoundaries$bivmap_mode <- as.factor(WatershedBoundaries$bivmap_mode)
+#plot to look -- only have 2 (fire) and 3 (neither)
+WatershedBoundaries$bivmap_mode %>% as.factor() %>% 
+  mutate(both = 1, fire = 2, neither = 3, water = 4)
+
+ggplot() +
+  geom_sf(data = WatershedBoundaries, aes(fill = bivmap_mode)) +
+  scale_fill_manual(values=palette_biv2) + 
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("Majority of Area in Watershed"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5))+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+#So there are no watersheds where the majority of pixels are water (4) or both (1) 
+
+
 ```
+
 
 
 
