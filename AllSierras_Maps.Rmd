@@ -66,6 +66,7 @@ saveRDS(background,"background.rds")
 
 
 ##Watershed Boundaries Map
+
 ```{r}
 palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
 
@@ -541,7 +542,7 @@ st_write(table1, "table1.shp")
 
 
 #Bivariate Colorpleth Map
-##Put potential water storage into raster
+######Put potential water storage into raster
 ```{r}
 #convert to spatVector object
 sv_AllSierras <- terra::vect(AllSierras_DamCapacity)
@@ -743,7 +744,7 @@ bivariate.map <- function(rasterx, rastery, colourmatrix = col.matrix,
 ```
 
 
-
+#######test 
 ```{r eval=FALSE, include=FALSE}
 bivariate.map <- function(rasterx, rastery, colourmatrix = col.matrix,
                           export.colour.matrix = TRUE,
@@ -830,8 +831,8 @@ length(cols)
 dim(rasterx)
 2536*1476 == length(cols)
 ```
-
-```{r}
+#######test
+```{r eval=FALSE, include=FALSE}
 nbreaks = 4
 colmat <- function(nbreaks = 3, breakstyle = "quantile",
                    upperleft = "#64ACBE", upperright = "#574249", 
@@ -928,7 +929,7 @@ bivmapQ
 ```
 
 
-
+#16 colors
 ##Read in your data
 ```{r}
 #read in your data 
@@ -970,8 +971,8 @@ fras <- ggplot() +
 vras + fras
 
 ```
-
-```{r cache=TRUE}
+#######test
+```{r eval=FALSE, cache=TRUE, include=FALSE}
 # Define the number of breaks
 nBreaks <- 4
 
@@ -1040,7 +1041,7 @@ saveRDS(volumeR, "volumeR.rds")
 fireResilience <- extend(riskExtract, contFireRisk)
 
 #Save as .tif files
-writeRaster(fireResilience, "fireResilience.tif", overwrite=T)
+writeRaster(fireResilience, "fireResilience.tif", overwrite=TRUE)
 writeRaster(volumeR, "waterStorage.tif", overwrite=T)
 writeRaster(contFireRisk, "fireResilienceAll.tif", overwrite=T)
 ```
@@ -1048,7 +1049,8 @@ writeRaster(contFireRisk, "fireResilienceAll.tif", overwrite=T)
 ##Read in your data
 ```{r}
 #read in your data 
- 
+
+
 fireResilienceAll <- rast("fireResilienceAll.tif")
 #fireResilience[is.na(fireResilience[])] <- 0
 waterStorage <- rast("waterStorage.tif")
@@ -1112,7 +1114,9 @@ map_q <- ggplot() +
 map_q <- map_q + inset_element(BivLegend, 0, 0, 0.2, 0.3)
 
 ```
-#Color matrix by watershed
+
+
+#4 colors
 ##Make a 2x2 color matrix for vis purposes
 ```{r}
 # Define the number of breaks
@@ -1125,7 +1129,9 @@ col.matrixQ2 <- colmat(nbreaks = nBreaks2, breakstyle = "quantile",
                        bottomleft = "#E8E8E8", upperleft = "#64ACBE",
                        saveLeg = FALSE, plotLeg = TRUE)
 
-palette_biv2 <- colorRampPalette(colors = c("#574249", "#C85A5A", "#E8E8E8", "#C85A5A"))(4)
+palette_biv2 <- colorRampPalette(colors = c("#574249", "#C85A5A", "#E8E8E8", "#64ACBE"))(4)
+
+
 ```
 
 ##New matrix
@@ -1148,33 +1154,339 @@ unique(bivmap_simple$color)
 #2	fire			
 #3	neither			
 #4	water
+```
+
+
+#Try again with fire extracted to stream network
+
+##extract data
+```{r}
+#Extract fire layer to just streams
+fireStreams <- extract(contFireRisk, AllSierras_DamCapacity, xy = TRUE, touches = TRUE)
+fireStreams <- fireStreams[,c(3,4,2)] #reorder for Rast function
+fireStreams <- rast(fireStreams, type = 'xyz')
+wkt <- crs(contFireRisk)
+crs(fireStreams) <- wkt
+plot(fireStreams)
+
+#make sure it's the right size
+fireStreams <- extend(fireStreams, contFireRisk)
+
+#save as raster
+writeRaster(fireStreams, "fireStreams.tif", overwrite=T)
+
+#read in your data 
+fireStreams <- rast("fireStreams.tif")
+waterStorage <- rast("waterStorage.tif")
+waterStorage[(waterStorage[] == 0)] <- NA
+fireStreams[(fireStreams[] == 0)] <- NA
+r2 <- c(fireStreams, waterStorage)
+names(r2) <- c("fireStreams","waterStorage")
+```
+
+##try with 4 colors
+```{r cache=TRUE}
+# Define the number of breaks
+nBreaks <- 2
+
+# Create the colour matrix
+col.matrixQ2 <- colmat(nbreaks = nBreaks, breakstyle = "quantile",
+                       xlab = "Fire", ylab = "Water", 
+                      bottomright = "#C85A5A", upperright = "#574249",
+                       bottomleft = "#E8E8E8", upperleft = "#64ACBE",
+                       saveLeg = TRUE, plotLeg = TRUE)
+
+
+# create the bivariate raster
+#if (!file.exists("bivmapQ.tif")) {
+  bivmapQ2 <- bivariate.map(rasterx = r2[["fireStreams"]], rastery = r2[["waterStorage"]],
+                          export.colour.matrix = TRUE,
+                          colourmatrix = col.matrixQ2, 
+                          )
+  writeRaster(bivmapQ2, "bivmapQ2.tif", overwrite = T)
+#}
+bivmapQ2 <- rast("bivmapQ2.tif")
+saveRDS(bivmapQ2, 'bivmapQ2.rds')
+
+# Convert to dataframe for plotting with ggplot
+library(data.table)
+bivMapDFQ2 <- setDT(as.data.frame(bivmapQ2, xy = TRUE))
+colnames(bivMapDFQ2)[3] <- "BivValue"
+bivMapDFQ2 <- melt(bivMapDFQ2, id.vars = c("x", "y"),
+                   measure.vars = "BivValue",
+                   value.name = "bivVal",
+                   variable.name = "Variable")
+
+plot(bivmapQ2)
+# Make the map using ggplot
+map_q2 <- ggplot() +
+    geom_raster(data = bivMapDFQ2, aes(x = x, y = y, fill = bivVal)) +
+      scale_fill_gradientn(colours = col.matrixQ2, na.value = "transparent") + 
+    #geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
+    theme_classic() + theme(panel.grid.major = element_blank(),
+                            panel.grid.minor = element_blank()) +
+    theme(text = element_text(size = 10, colour = "black")) +
+    borders(colour = "black", size = 0.1) +
+    coord_quickmap() +
+    theme(legend.position = "none",
+          plot.background = element_blank(),
+          strip.text = element_blank(), 
+          #axis.text.y = element_blank(),
+          #axis.text = element_blank(),
+          axis.title = element_blank())
+
+map_q2 <- map_q + inset_element(BivLegend, 0, 0, 0.2, 0.3)
+
+```
+##post processing
+```{r}
+colMatrix_rasValuesfireStreams %>%
+  distinct(rasValue, HEX)
+
+show_col(colMatrix_rasValuesfireStreams$HEX)
+#HOOK UP THE COLOR WITH THE  HEX CODE and the  raster number 
+
+#check and see what it looks like
+plot(bivmapQ2)
+unique(bivmapQ2)
+#1	neither			
+#2	water			
+#5	fire			
+#6	both
 
 #hook up to watershed boundaries to aggregate by watershed
-WatershedBoundaries$bivmap <- exact_extract(bivmap_simple$color, WatershedBoundaries, 'frac')
-WatershedBoundaries$bivmap_mode <- exact_extract(bivmap_simple$color, WatershedBoundaries, 'mode')
-WatershedBoundaries$bivmap_mode <- as.factor(WatershedBoundaries$bivmap_mode)
-#plot to look -- only have 2 (fire) and 3 (neither)
-WatershedBoundaries$bivmap_mode %>% as.factor() %>% 
-  mutate(both = 1, fire = 2, neither = 3, water = 4)
+WatershedBoundaries$bivmap <- exact_extract(bivmapQ2$fireStreams, WatershedBoundaries, 'frac')
+WatershedBoundaries$bivmap_mode <- exact_extract(bivmapQ2$fireStreams, WatershedBoundaries, 'mode')
+WatershedBoundaries$cat <- ifelse(WatershedBoundaries$bivmap_mode == 1,"neither",
+                       ifelse(WatershedBoundaries$bivmap_mode == 2,"water",
+                              ifelse(WatershedBoundaries$bivmap_mode == 5,"fire","both")))
 
-ggplot() +
-  geom_sf(data = WatershedBoundaries, aes(fill = bivmap_mode)) +
+
+map_w <- ggplot() +
+  geom_sf(data = WatershedBoundaries, aes(fill = cat), na.rm=T) +
   scale_fill_manual(values=palette_biv2) + 
   xlab(NULL)+
   ylab(NULL)+
-  ggtitle(expression(paste("Majority of Area in Watershed"))) + 
+  #ggtitle(expression(paste("Majority of Area in Watershed"))) + 
   theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5))+
-  theme(panel.border = element_rect(colour = "black", fill=NA))
+  theme(panel.grid.major = element_line(colour = "transparent")) +
+  theme(axis.text.x = element_blank(), axis.text.y = element_blank()) +
+  theme(legend.position = "none")
+  #theme(plot.title = element_text(hjust = 0.5, size = 12),
+          #plot.subtitle = element_text(hjust = 0.5))+
+  #theme(panel.border = element_rect(colour = "black", fill=NA))
 #So there are no watersheds where the majority of pixels are water (4) or both (1) 
+
+
+```
+##Watershed-Grouping
+###Apply to watersheds
+```{r}
+#Did this already with: 
+#WatershedBoundaries$bivmap <- exact_extract(bivmapQ2$fireStreams, WatershedBoundaries, 'frac')
+
+```
+
+```{r}
+WatershedBoundariesdf <- st_drop_geometry(WatershedBoundaries)
+WatershedBoundariesdf$frac_1 <- WatershedBoundariesdf$bivmap[[1]]
+WatershedBoundariesdf$frac_2 <- WatershedBoundariesdf$bivmap[[2]]
+WatershedBoundariesdf$frac_5 <- WatershedBoundariesdf$bivmap[[3]]
+WatershedBoundariesdf$frac_6 <- WatershedBoundariesdf$bivmap[[4]]
+WatershedBoundariesdf <- WatershedBoundariesdf %>%
+  mutate(HUCID_num = as.numeric(sub("^HUC ", "", as.character(HUCID)))) %>% 
+  mutate(HUCID_num = as.character(HUCID_num))
+
+
+data_long <- tidyr::pivot_longer(WatershedBoundariesdf, cols = c(frac_1, frac_2, frac_5, frac_6), names_to = "variable", values_to = "percentage")
+
+# Plot
+map_b <- ggplot(data_long, aes(x = HUCID_num, y = percentage, fill = variable)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("frac_1" = "#E8E8E8", "frac_2" = "#64ACBE", "frac_5" ="#C85A5A", "frac_6" ="#574249")) +
+  labs(title = "Percentage of watershed in each category",
+       x = "HUC ID",
+       y = "Percentage") +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(panel.grid = element_blank())+
+  theme(legend.position = "none")
 
 
 ```
 
 
+#9 colors Try again with fire extracted to stream network
+##palette
+```{r}
+# Define the number of breaks
+nBreaks3 <- 3
+
+# Create the colour matrix
+col.matrixQ3 <- colmat(nbreaks = nBreaks3, breakstyle = "quantile",
+                       xlab = "Fire", ylab = "Water", 
+                      bottomright = "#C85A5A", upperright = "#574249",
+                       bottomleft = "#E8E8E8", upperleft = "#64ACBE",
+                       saveLeg = FALSE, plotLeg = TRUE)
+
+palette_biv3 <- colorRampPalette(colors = c("#E8E8E8", "#A5CAD3", "#64ACBE", "#D8A1A1", "#9A8C92","#5D7783","#C85A5A","#8F4E51","#574249"))(9)
 
 
 
+```
+
+##extract data
+```{r}
+
+#read in your data 
+fireStreams <- rast("fireStreams.tif")
+waterStorage <- rast("waterStorage.tif")
+waterStorage[(waterStorage[] == 0)] <- NA
+fireStreams[(fireStreams[] == 0)] <- NA
+r3 <- c(fireStreams, waterStorage)
+names(r3) <- c("fireStreams","waterStorage")
+```
+
+##try with 9 colors
+```{r cache=TRUE}
+# Define the number of breaks
+nBreaks <- 3
+
+# Create the colour matrix
+col.matrixQ3 <- colmat(nbreaks = nBreaks, breakstyle = "quantile",
+                       xlab = "Fire", ylab = "Water", 
+                      bottomright = "#C85A5A", upperright = "#574249",
+                       bottomleft = "#E8E8E8", upperleft = "#64ACBE",
+                       saveLeg = F, plotLeg = TRUE)
 
 
+# create the bivariate raster
+#if (!file.exists("bivmapQ.tif")) {
+  bivmapQ3 <- bivariate.map(rasterx = r3[["fireStreams"]], rastery = r3[["waterStorage"]],
+                          export.colour.matrix = TRUE,
+                          colourmatrix = col.matrixQ3, 
+                          )
+  writeRaster(bivmapQ3, "bivmapQ3.tif", overwrite = T)
+#}
+bivmapQ3 <- rast("bivmapQ3.tif")
+saveRDS(bivmapQ3, 'bivmapQ3.rds')
+
+# Convert to dataframe for plotting with ggplot
+library(data.table)
+bivMapDFQ3 <- setDT(as.data.frame(bivmapQ3, xy = TRUE))
+colnames(bivMapDFQ3)[3] <- "BivValue"
+bivMapDFQ3 <- melt(bivMapDFQ3, id.vars = c("x", "y"),
+                   measure.vars = "BivValue",
+                   value.name = "bivVal",
+                   variable.name = "Variable")
+
+plot(bivmapQ3)
+# Make the map using ggplot
+map_q3 <- ggplot() +
+    geom_raster(data = bivMapDFQ3, aes(x = x, y = y, fill = bivVal)) +
+      scale_fill_gradientn(colours = col.matrixQ3, na.value = "transparent") + 
+    #geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
+    theme_classic() + theme(panel.grid.major = element_blank(),
+                            panel.grid.minor = element_blank()) +
+    theme(text = element_text(size = 10, colour = "black")) +
+    borders(colour = "black", size = 0.1) +
+    coord_quickmap() +
+    theme(legend.position = "none",
+          plot.background = element_blank(),
+          strip.text = element_blank(), 
+          #axis.text.y = element_blank(),
+          #axis.text = element_blank(),
+          axis.title = element_blank())
+
+map_q3 <- map_q3 + inset_element(BivLegend, 0, 0, 0.2, 0.3)
+
+```
+
+
+##post processing
+```{r}
+colMatrix_rasValuesfireStreams %>%
+  distinct(rasValue, HEX)
+
+show_col(colMatrix_rasValuesfireStreams$HEX)
+#HOOK UP THE COLOR WITH THE  HEX CODE and the  raster number 
+
+#check and see what it looks like
+plot(bivmapQ3)
+
+#hook up to watershed boundaries to aggregate by watershed
+WatershedBoundaries$bivmap3 <- exact_extract(bivmapQ3$fireStreams, WatershedBoundaries, 'frac')
+WatershedBoundaries$bivmap_mode3 <- exact_extract(bivmapQ3$fireStreams, WatershedBoundaries, 'mode')
+
+#NOT AGGREGATING--- JUST DOING 9 categories 
+#WatershedBoundaries$cat <- ifelse(WatershedBoundaries$bivmap_mode == 1,"neither",
+                      # ifelse(WatershedBoundaries$bivmap_mode == 2,"water",
+                          #    ifelse(WatershedBoundaries$bivmap_mode == 5,"fire","both")))
+
+
+map_w3 <- ggplot() +
+  geom_sf(data = WatershedBoundaries, aes(fill = cat), na.rm=T) +
+  scale_fill_manual(values=palette_biv3) + 
+  xlab(NULL)+
+  ylab(NULL)+
+  #ggtitle(expression(paste("Majority of Area in Watershed"))) + 
+  theme_minimal() +
+  theme(panel.grid.major = element_line(colour = "transparent")) +
+  theme(axis.text.x = element_blank(), axis.text.y = element_blank()) +
+  theme(legend.position = "none")
+  #theme(plot.title = element_text(hjust = 0.5, size = 12),
+          #plot.subtitle = element_text(hjust = 0.5))+
+  #theme(panel.border = element_rect(colour = "black", fill=NA))
+#So there are no watersheds where the majority of pixels are water (4) or both (1) 
+
+
+```
+##Watershed-Grouping
+###Apply to watersheds
+```{r}
+#Did this already with: 
+#WatershedBoundaries$bivmap <- exact_extract(bivmapQ2$fireStreams, WatershedBoundaries, 'frac')
+
+```
+
+```{r}
+WatershedBoundariesdf3 <- st_drop_geometry(WatershedBoundaries)
+WatershedBoundariesdf3$frac_1 <- WatershedBoundariesdf3$bivmap3[[1]]
+WatershedBoundariesdf3$frac_2 <- WatershedBoundariesdf3$bivmap3[[2]]
+WatershedBoundariesdf3$frac_3 <- WatershedBoundariesdf3$bivmap3[[3]]
+WatershedBoundariesdf3$frac_7 <- WatershedBoundariesdf3$bivmap3[[4]]
+WatershedBoundariesdf3$frac_8 <- WatershedBoundariesdf3$bivmap3[[5]]
+WatershedBoundariesdf3$frac_9 <- WatershedBoundariesdf3$bivmap3[[6]]
+WatershedBoundariesdf3$frac_10 <- WatershedBoundariesdf3$bivmap3[[7]]
+WatershedBoundariesdf3$frac_11 <- WatershedBoundariesdf3$bivmap3[[8]]
+WatershedBoundariesdf3$frac_12 <- WatershedBoundariesdf3$bivmap3[[9]]
+
+WatershedBoundariesdf3 <- WatershedBoundariesdf3 %>%
+  mutate(HUCID_num = as.numeric(sub("^HUC ", "", as.character(HUCID)))) %>% 
+  mutate(HUCID_num = as.character(HUCID_num))
+
+
+data_long3 <- tidyr::pivot_longer(WatershedBoundariesdf3, cols = c(frac_1, frac_2, frac_3, frac_7, frac_8, frac_9, frac_10, frac_11, frac_12), names_to = "variable", values_to = "percentage")
+
+# Plot
+map_b3 <- ggplot(data_long3, aes(x = HUCID_num, y = percentage, fill = variable)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("frac_1" = "#E8E8E8", "frac_2" = "#A5CAD3", "frac_3" ="#64ACBE", "frac_7" ="#D8A1A1", "frac_8" = "#9A8C92", "frac_9" = "#5D7783", 'frac_10' = "#C85A5A", 'frac_11' = "#8F4E51", 'frac_12' = "#574249")) +
+  labs(title = "Percentage of watershed in each category",
+       x = "HUC ID",
+       y = "Percentage") +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(panel.grid = element_blank())+
+  theme(legend.position = "none")
+
+1	#E8E8E8			
+2	#A5CAD3			
+3	#64ACBE			
+7	#D8A1A1			
+8	#9A8C92			
+9	#5D7783			
+10	#C85A5A			
+11	#8F4E51			
+12	#574249
+```

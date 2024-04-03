@@ -100,10 +100,10 @@ saveRDS(PADUS,"PADUS.rds")
 ###WatershedBoundaries
 ```{r}
 # Read in the shapefile with st_read()
-#WatershedBoundaries <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/WatershedBoundaries2.shp")
+WatershedBoundaries <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/WatershedBoundaries3.shp")
 
 #remove unneeded shapefiles
-#file.remove(list.files(pattern = "WatershedBoundaries*",recursive = F))
+file.remove(list.files(pattern = "WatershedBoundaries*",recursive = F))
 
 # Read in shapefile from previously imported shapefile
 WatershedBoundaries <- readRDS("WatershedBoundaries.rds")
