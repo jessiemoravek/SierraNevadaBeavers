@@ -536,7 +536,7 @@ table1 <- test_df %>%
                  `Total area of potential fire resilience in high-risk fire areas (km2)` = area_km2)
 
 st_as_sf(table1)
-st_write(table1, "table1.shp")
+#st_write(table1, "table1.shp")
 ```
 
 
@@ -942,7 +942,7 @@ names(r) <- c("fireResilience","waterStorage")
 
 ```
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 #volumeR[(volumeR[] == 0)] <- NA
 
 vras <- ggplot() +
@@ -1047,7 +1047,7 @@ writeRaster(contFireRisk, "fireResilienceAll.tif", overwrite=T)
 ```
 
 ##Read in your data
-```{r}
+```{r eval=FALSE, include=FALSE}
 #read in your data 
 
 
@@ -1062,7 +1062,7 @@ plot(fireResilienceAll)
 plot(waterStorage)
 ```
 ##HELL YES IT WORKED
-```{r cache=TRUE}
+```{r eval=FALSE, cache=TRUE, include=FALSE}
 # Define the number of breaks
 nBreaks <- 4
 
@@ -1135,7 +1135,7 @@ palette_biv2 <- colorRampPalette(colors = c("#574249", "#C85A5A", "#E8E8E8", "#6
 ```
 
 ##New matrix
-```{r}
+```{r eval=FALSE, include=FALSE}
 colMatrix_rasValuesfireResilienceAll %>%
   distinct(rasValue, HEX)
 
@@ -1235,7 +1235,7 @@ map_q2 <- ggplot() +
           #axis.text = element_blank(),
           axis.title = element_blank())
 
-map_q2 <- map_q + inset_element(BivLegend, 0, 0, 0.2, 0.3)
+map_q2 <- map_q2 + inset_element(BivLegend, 0, 0, 0.2, 0.3)
 
 ```
 ##post processing

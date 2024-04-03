@@ -100,6 +100,17 @@ h <- ggplot() +
 ```{r}
 (h + c)
 ```
+
+##total km
+```{r}
+*.001
+
+#159012 km
+
+sum(AllSierras_DamCapacity$mCC_EX_CT)
+sum(AllSierras_DamCapacity$mCC_HPE_CT)
+```
+
 #Calculate Historical Percent Remaining
 ```{r}
 AllSierras_DamCapacity$mCC_EXvHPE <- AllSierras_DamCapacity$oCC_EX/AllSierras_DamCapacity$oCC_HPE
