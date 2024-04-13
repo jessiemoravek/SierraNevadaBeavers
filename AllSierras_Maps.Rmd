@@ -392,7 +392,10 @@ fireDamExtract <- extract(contFireRisk, AllSierras_DamCapacity, xy = TRUE, touch
 ###pull high quality areas
 ```{r}
 highquality <- subset(AllSierras_DamCapacity, oCC_EX >= 5) #pull out good habitat
+```
 
+
+```{r}
 palette_new <- colorRampPalette(colors = c( "#00FF50", "#4900FF"))(2)
 #scales::show_col(palette_new)
 
@@ -1792,8 +1795,8 @@ hucndc_plot <- ggplot() +
 #normVol = potential volume storage / total length of streams in watershed
 
 
-#fireRisk_normalized = area of high fire risk pixels / total pixels 
-WatershedBoundaries$npixels <- exact_extract(riskExtract, WatershedBoundaries, 'count')
+#1: fireRisk_normalized = area of high fire risk pixels / total pixels 
+WatershedBoundaries$npixels <- exact_extract(highRisk, WatershedBoundaries, 'count')
 WatershedBoundaries$area_m2 <- WatershedBoundaries$npixels*270*270  
 WatershedBoundaries$area_km2 <- round(WatershedBoundaries$area_m2/1e6,2)
 WatershedBoundaries$total_area <- as.numeric(st_area(WatershedBoundaries))
@@ -1802,35 +1805,35 @@ WatershedBoundaries$firerisk_normalized <- WatershedBoundaries$area_m2 / Watersh
 
 
 
-#firerisk_normalized_Streamshq = area of fire resilient pixels / pixels along streams 
+#2: firerisk_normalized_Streamshq = area of fire resilient pixels / pixels along streams 
 #High fire risk pixels along streams
-riskExtract_Streams <- extract(riskExtract, AllSierras_DamCapacity, xy = TRUE, touches = TRUE, na.rm=T)
-riskExtract_Streams <- riskExtract_Streams[,c(3,4,2)] #reorder for Rast function
-riskExtract_Streams <- riskExtract_Streams[complete.cases(riskExtract_Streams), ]
-riskExtract_Streams <- rast(riskExtract_Streams, type = 'xyz')
+highRisk_Streams <- extract(highRisk, AllSierras_DamCapacity, xy = TRUE, touches = TRUE, na.rm=T)
+highRisk_Streams <- highRisk_Streams[,c(3,4,2)] #reorder for Rast function
+highRisk_Streams <- highRisk_Streams[complete.cases(highRisk_Streams), ]
+highRisk_Streams <- rast(highRisk_Streams, type = 'xyz')
 wkt <- crs(contFireRisk)
-crs(riskExtract_Streams) <- wkt
-plot(riskExtract_Streams)
+crs(highRisk_Streams) <- wkt
+plot(highRisk_Streams)
 #make sure it's the right size
-riskExtract_Streams <- extend(riskExtract_Streams, contFireRisk)
+highRisk_Streams <- extend(highRisk_Streams, contFireRisk)
 #extract to watersheds
-WatershedBoundaries$npixels_Streams <- exact_extract(riskExtract_Streams, WatershedBoundaries, 'count')
+WatershedBoundaries$npixels_Streams <- exact_extract(highRisk_Streams, WatershedBoundaries, 'count')
 WatershedBoundaries$area_m2_Streams <- WatershedBoundaries$npixels_Streams*270*270  
 WatershedBoundaries$area_km2_Streams <- round(WatershedBoundaries$area_m2_Streams/1e6,2)
 
 
 #High fire risk pixels along high quality streams
-riskExtract_Streamshq <- extract(riskExtract, highquality, xy = TRUE, touches = TRUE)
-riskExtract_Streamshq <- riskExtract_Streamshq[,c(3,4,2)] #reorder for Rast function
-riskExtract_Streamshq <- riskExtract_Streamshq[complete.cases(riskExtract_Streamshq), ]
-riskExtract_Streamshq <- rast(riskExtract_Streamshq, type = 'xyz')
+highRisk_Streamshq <- extract(highRisk, highquality, xy = TRUE, touches = TRUE)
+highRisk_Streamshq <- highRisk_Streamshq[,c(3,4,2)] #reorder for Rast function
+highRisk_Streamshq <- highRisk_Streamshq[complete.cases(highRisk_Streamshq), ]
+highRisk_Streamshq <- rast(highRisk_Streamshq, type = 'xyz')
 wkt <- crs(contFireRisk)
-crs(riskExtract_Streamshq) <- wkt
-plot(riskExtract_Streamshq)
+crs(highRisk_Streamshq) <- wkt
+plot(highRisk_Streamshq)
 #make sure it's the right size
-riskExtract_Streamshq <- extend(riskExtract_Streamshq, contFireRisk)
+highRisk_Streamshq <- extend(highRisk_Streamshq, contFireRisk)
 #extract to watersheds
-WatershedBoundaries$npixels_Streamshq <- exact_extract(riskExtract_Streamshq, WatershedBoundaries, 'count')
+WatershedBoundaries$npixels_Streamshq <- exact_extract(highRisk_Streamshq, WatershedBoundaries, 'count')
 WatershedBoundaries$area_m2_Streamshq <- WatershedBoundaries$npixels_Streams*270*270  
 WatershedBoundaries$area_km2_Streamshq <- round(WatershedBoundaries$area_m2_Streams/1e6,2)
 WatershedBoundaries$firerisk_normalized_Streamshq <- WatershedBoundaries$area_m2_Streamshq / WatershedBoundaries$total_area
@@ -1841,11 +1844,18 @@ WatershedBoundaries$firerisk_normalized_Streamshq <- WatershedBoundaries$area_m2
 AllSierras_DamCapacity$VolumePerKm <-  AllSierras_DamCapacity$volume/((AllSierras_DamCapacity$iGeo_Len)*0.001)
 watersheds <- st_join(WatershedBoundaries,AllSierras_DamCapacity)
 
-watersheds <- watersheds %>%
-    group_by(geometry) %>% 
-    summarise(normVol = mean(VolumePerKm))
+watershedstest <- watersheds %>%
+    group_by(HUCID) %>% 
+    summarise(normVol = mean(VolumePerKm)) 
 
-WatershedBoundaries <- st_join(WatershedBoundaries, watersheds, by = "geometry")
+
+
+test <- merge(watersheds, df, by.x = 0, by.y =  "ID")
+
+watersheds <- st_as_sf(watersheds)
+WatershedBoundaries <- st_as_sf(WatershedBoundaries)
+watersheds$HUCID == WatershedBoundaries$HUCID
+test <- merge(WatershedBoundaries, watersheds, by = "HUCID")
 ```
 
 
@@ -1865,22 +1875,24 @@ huc_ndc_plot <- ggplot() +
     #labs(color = "dams/km", size=10)+
     theme(panel.border = element_rect(colour = "black", fill=NA))
 
+
 normVol_plot <- ggplot() +
-   # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
-    geom_sf(data = WatershedBoundaries, aes(fill = (normVol)), lwd = 0.1) +
-    scale_fill_viridis_c(option = 'plasma') +
-    theme_minimal()+
-    ggtitle(expression(paste("Potential Water Storage (m3/km)"))) +
-    theme(plot.title = element_text(hjust = 0.5, size = 12),
+  geom_sf(data = WatershedBoundaries) +
+  geom_sf(data = watersheds, aes(fill = normVol), inherit.aes = FALSE) +
+  scale_fill_viridis_c(option = "plasma") + 
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("Potential Water Storage (m3/km)"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
-    #theme(element_text(size=10),legend.position = c(.15,.2))+
-    #labs(color = "dams/km", size=10)+
-    theme(panel.border = element_rect(colour = "black", fill=NA))
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
 
 firerisk_normalized_plot <- ggplot() +
    # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, aes(fill = (firerisk_normalized)), lwd = 0.1) +
-    scale_fill_viridis_c(option = 'inferno') +
+    scale_fill_viridis_c(option = 'inferno', limits = c(0,0.6)) +
     theme_minimal()+
     ggtitle(expression(paste("% Area High Fire Risk"))) +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
@@ -1892,7 +1904,7 @@ firerisk_normalized_plot <- ggplot() +
 firerisk_normalized_Streamshq_plot <- ggplot() +
    # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, aes(fill = (firerisk_normalized_Streamshq)), lwd = 0.1) +
-    scale_fill_viridis_c(option = 'inferno') +
+    scale_fill_viridis_c(option = 'inferno',limits = c(0,0.6)) +
     theme_minimal()+
     ggtitle(expression(paste("% Area High-Risk-High-Capacity"))) +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
@@ -1907,182 +1919,27 @@ firerisk_normalized_Streamshq_plot <- ggplot() +
 ```
 
 
-
-
-
-##Function producing color matrix (from Chapman et al. 2023)
+##Make a scatterplot
 ```{r}
-# The function that produces the colour matrix
-colmat <- function(nbreaks = 3, breakstyle = "quantile",
-                   upperleft = "#64ACBE", upperright = "#574249", 
-                   bottomleft = "#E8E8E8", bottomright = "#C85A5A",
-                   xlab = "x label", ylab = "y label", plotLeg = TRUE,
-                   saveLeg = FALSE) {
-   # TODO - replace any tidyr, dplyr etc. functions with data.table #
-  library(tidyverse)
-  require(ggplot2)
-  require(classInt)
-  library(data.table)
-  if (breakstyle == "sd") {
-    warning("SD breaks style cannot be used.\nWill not always return the correct number of breaks.\nSee classInt::classIntervals() for details.\nResetting to quantile",
-            call. = FALSE, immediate. = FALSE)
-    breakstyle <- "quantile"}
-  # The colours can be changed by changing the HEX codes for:
-  # upperleft, upperright, bottomleft, bottomright
-  # From http://www.joshuastevens.net/cartography/make-a-bivariate-choropleth-map/
-  # upperleft = "#64ACBE", upperright = "#574249", bottomleft = "#E8E8E8", bottomright = "#C85A5A",
-  # upperleft = "#BE64AC", upperright = "#3B4994", bottomleft = "#E8E8E8", bottomright = "#5AC8C8",
-  # upperleft = "#73AE80", upperright = "#2A5A5B", bottomleft = "#E8E8E8", bottomright = "#6C83B5", 
-  # upperleft = "#9972AF", upperright = "#804D36", bottomleft = "#E8E8E8", bottomright = "#C8B35A",
-  # upperleft = "#DA8DC8", upperright = "#697AA2", bottomleft = "#E8E8E8", bottomright = "#73BCA0",
-  # Similar to Teuling, Stockli, Seneviratnea (2011) [https://doi.org/10.1002/joc.2153]
-  # upperleft = "#F7900A", upperright = "#993A65", bottomleft = "#44B360", bottomright = "#3A88B5",
-  # Viridis style
-  # upperleft = "#FEF287", upperright = "#21908D", bottomleft = "#E8F4F3", bottomright = "#9874A1",
-  # Similar to Fjeldsa, Bowie, Rahbek 2012
-  # upperleft = "#34C21B", upperright = "#FFFFFF", bottomleft = "#595757",  bottomright = "#A874B8",
-  # Default from original source
-  # upperleft = "#0096EB", upperright = "#820050", bottomleft= "#BEBEBE", bottomright = "#FFE60F",
-  my.data <- seq(0, 1, .01)
-  # Default uses terciles (Lucchesi and Wikle [2017] doi: 10.1002/sta4.150)
-  my.class <- classInt::classIntervals(my.data,
-                                       n = nbreaks,
-                                       style = breakstyle,
-                                       )
-  my.pal.1 <- classInt::findColours(my.class, c(upperleft, bottomleft))
-  my.pal.2 <- classInt::findColours(my.class, c(upperright, bottomright))
-  col.matrix <- matrix(nrow = 101, ncol = 101, NA)
-  for (i in 1:101) {
-    my.col <- c(paste(my.pal.1[i]), paste(my.pal.2[i]))
-    col.matrix[102 - i, ] <- classInt::findColours(my.class, my.col)
-  }
-  ## need to convert this to data.table at some stage.
-  col.matrix.plot <- col.matrix %>%
-    as.data.frame(.) %>% 
-    mutate("Y" = row_number()) %>%
-    mutate_at(.tbl = ., .vars = vars(starts_with("V")), .funs = list(as.character)) %>% 
-    pivot_longer(data = ., cols = -Y, names_to = "X", values_to = "HEXCode") %>% 
-    mutate("X" = as.integer(sub("V", "", .$X))) %>%
-    distinct(as.factor(HEXCode), .keep_all = TRUE) %>%
-    mutate(Y = rev(.$Y)) %>% 
-    dplyr::select(-c(4)) %>%
-    mutate("Y" = rep(seq(from = 1, to = nbreaks, by = 1), each = nbreaks),
-           "X" = rep(seq(from = 1, to = nbreaks, by = 1), times = nbreaks)) %>%
-    mutate("UID" = row_number())
-  # Use plotLeg if you want a preview of the legend
-  if (plotLeg) {
-    p <- ggplot(col.matrix.plot, aes(X, Y, fill = HEXCode)) +
-      geom_tile() +
-      scale_fill_identity() +
-      coord_equal(expand = FALSE) +
-      theme_void() +
-      theme(aspect.ratio = 1,
-            axis.title = element_text(size = 10, colour = "black",hjust = 0.5, 
-                                      vjust = 1),
-            axis.title.y = element_text(size = 10, angle = 90, hjust = 0.5, vjust = 1)) +
-      xlab(bquote(.(xlab) ~  symbol("\256"))) +
-      ylab(bquote(.(ylab) ~  symbol("\256")))
-    print(p)
-    assign(
-      x = "BivLegend",
-      value = p,
-      pos = .GlobalEnv
-    )
-  }
-  # Use saveLeg if you want to save a copy of the legend
-  if (saveLeg) {
-    ggsave(filename = "bivLegend.pdf", plot = p, device = "pdf",
-           path = "./", width = 4, height = 4, units = "in",
-           dpi = 300)
-  }
-  seqs <- seq(0, 100, (100 / nbreaks))
-  seqs[1] <- 1
-  col.matrix <- col.matrix[c(seqs), c(seqs)]
-  attr(col.matrix, "breakstyle") <- breakstyle
-  attr(col.matrix, "nbreaks") <- nbreaks
-  return(col.matrix)
-}
+summary(WatershedBoundaries$firerisk_normalized)
+#mean = 0.2
+x_value <- 0.2
+y_value = 1
 
-
-
-# Function to assign colour-codes to raster data
-# As before, by default assign tercile breaks
-bivariate.map <- function(rasterx, rastery, colourmatrix = col.matrix,
-                          export.colour.matrix = TRUE,
-                          outname = paste0("colMatrix_rasValues", names(rasterx))) {
-  # TO DO - replace raster with terra #
-  #require(raster)
-  require(classInt)
-  # export.colour.matrix will export a data.frame of rastervalues and RGB codes 
-  # to the global environment outname defines the name of the data.frame
-  quanx <- values(rasterx)
-  tempx <- data.frame(quanx, quantile = rep(NA, length(quanx)))
-  brks <- with(tempx, classIntervals(quanx,
-                                    n = attr(colourmatrix, "nbreaks"),
-                                    style = attr(colourmatrix, "breakstyle"))$brks)
-  ## Add (very) small amount of noise to all but the first break
-  ## https://stackoverflow.com/a/19846365/1710632
-  brks[-1] <- brks[-1] + seq_along(brks[-1]) * .Machine$double.eps
-  r1 <- within(tempx, quantile <- cut(quanx,
-                                     breaks = brks,
-                                     labels = 2:length(brks),
-                                     include.lowest = TRUE))
-  quantr <- data.frame(r1[, 2])
-  quany <- values(rastery)
-  tempy <- data.frame(quany, quantile = rep(NA, length(quany)))
-  brksy <- with(tempy, classIntervals(quany,
-                                     n = attr(colourmatrix, "nbreaks"),
-                                     style = attr(colourmatrix, "breakstyle"))$brks)
-  brksy[-1] <- brksy[-1] + seq_along(brksy[-1]) * .Machine$double.eps
-  r2 <- within(tempy, quantile <- cut(quany,
-                                     breaks = brksy,
-                                     labels = 2:length(brksy),
-                                     include.lowest = TRUE
-  ))
-  quantr2 <- data.frame(r2[, 2])
-  as.numeric.factor <- function(x) {
-    as.numeric(levels(x))[x]
-  }
-  col.matrix2 <- colourmatrix
-  cn <- unique(colourmatrix)
-  for (i in 1:length(col.matrix2)) {
-    ifelse(is.na(col.matrix2[i]),
-           col.matrix2[i] <- 1, col.matrix2[i] <- which(
-             col.matrix2[i] == cn
-           )[1]
-    )
-  }
-  # Export the colour.matrix to data.frame() in the global env
-  # Can then save with write.table() and use in ArcMap/QGIS
-  # Need to save the output raster as integer data-type
-  if (export.colour.matrix) {
-    # create a dataframe of colours corresponding to raster values
-    exportCols <- as.data.frame(cbind(
-      as.vector(col.matrix2), as.vector(colourmatrix),
-      t(col2rgb(as.vector(colourmatrix)))
-    ))
-    # rename columns of data.frame()
-    colnames(exportCols)[1:2] <- c("rasValue", "HEX")
-    #return(exportCols)
-    # Export to the global environment
-    assign(
-      x = outname,
-      value = exportCols,
-      pos = .GlobalEnv
-    )
-  }
-  cols <- numeric(length(quantr[, 1]))
-  for (i in 1:length(quantr[, 1])) {
-    a <- as.numeric.factor(quantr[i, 1])
-    b <- as.numeric.factor(quantr2[i, 1])
-    cols[i] <- as.numeric(col.matrix2[b, a])
-  }
-  r <- rasterx
-  r[] <- cols
-  return(r)
-}
-
+#Vertical black line represents % high fire risk = 0.2, which is the mean
+#horizontal black line represents NDC <1, indicating watersheds with no water deficit
+ggplot()+
+  geom_point(data = WatershedBoundaries, aes(x = firerisk_normalized, y = (huc_ndc)))+
+  geom_vline(xintercept = x_value, color = "black", linetype = "solid") +
+  geom_hline(yintercept = y_value, color = "black", linetype = "solid") +
+  theme_minimal()+
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE), trans = "log10")+
+  ggtitle(expression(paste("Water Deficit vs. NDC by watershed"))) +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    #theme(element_text(size=10),legend.position = c(.15,.2))+
+  labs(x = "% Watershed Area with High Fire Risk",
+       y = "NDC")+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
 ```
-
-
 
