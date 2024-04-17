@@ -83,6 +83,8 @@ w <- ggplot() +
           plot.subtitle = element_text(hjust = 0.5)) +
     #theme(element_text(size=10),legend.position = c(.15,.2))+
     #labs(color = "dams/km", size=10)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
     theme(panel.border = element_rect(colour = "black", fill=NA))
 
 ```
@@ -94,13 +96,20 @@ w <- ggplot() +
 c <- ggplot() +
     #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
-    scale_color_manual(values=palette_new)+
+    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
+    scale_color_manual(values=palette_new,
+                        labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
     theme_minimal()+
     ggtitle(expression(paste("Current Dam Capacity"))) +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20))+
     #theme(element_text(size=10),legend.position = c(.15,.2))+
     labs(color = "dams/km", size=10)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
     theme(panel.border = element_rect(colour = "black", fill=NA))
 
 ```
@@ -110,13 +119,20 @@ c <- ggplot() +
 h <- ggplot() +
     #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(oCC_HPE, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
-    scale_color_manual(values=palette_new)+
+    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
+    scale_color_manual(values=palette_new,
+                        labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
     theme_minimal()+
     ggtitle(expression(paste("Historical Dam Capacity"))) +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20))+
     #theme(element_text(size=10),legend.position = c(.15,.2))+
     labs(color = "dams/km", size=10)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
     theme(panel.border = element_rect(colour = "black", fill=NA))
 
 ```
@@ -140,6 +156,8 @@ r <- ggplot() +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
     #theme(element_text(size=10),legend.position = c(.15,.2))+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
     labs(color = "dams/km", size=10)+
     theme(panel.border = element_rect(colour = "black", fill=NA))
 
@@ -164,6 +182,12 @@ veg <- ggplot() +
     theme_minimal() +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5))+
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20))+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+    labs(color = "Vegetation\nChange")+
     theme(panel.border = element_rect(colour = "black", fill=NA)) 
 ```
 
@@ -199,6 +223,8 @@ hmap <- ggplot() +
     theme_minimal() +
     theme(plot.title = element_text(hjust = 0.5),
           plot.subtitle = element_text(hjust = 0.5)) +
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
     theme(panel.border = element_rect(colour = "black", fill=NA))
 ```
 
@@ -211,6 +237,8 @@ currentVol <- ggplot() +
     ylab(NULL)+
     ggtitle(expression(paste("Potential Water Storage (m3)"))) + 
     theme_minimal() +
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
     theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) 
 ```
@@ -231,6 +259,14 @@ vol <- ggplot() +
     theme_minimal() +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20))+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+    labs(color = "Volume\nChange (m3)")+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
     theme(panel.border = element_rect(colour = "black", fill=NA))
 ```
 ###Map of watersheds + veg + volume
@@ -242,6 +278,8 @@ C#
 
 r + veg + vol + 
   plot_layout(design = layout)
+
+h+c+veg
 ```
 
 
@@ -1016,7 +1054,7 @@ bivmapQ
 ##Read in your data
 ```{r}
 #read in your data 
- 
+plot(waterStorage)
 fireResilience <- rast("fireResilience.tif")
 #fireResilience[is.na(fireResilience[])] <- 0
 waterStorage <- rast("waterStorage.tif")
@@ -1251,6 +1289,7 @@ fireStreams <- rast(fireStreams, type = 'xyz')
 wkt <- crs(contFireRisk)
 crs(fireStreams) <- wkt
 plot(fireStreams)
+plot(waterStorage)
 
 #make sure it's the right size
 fireStreams <- extend(fireStreams, contFireRisk)
@@ -1580,34 +1619,33 @@ map_b3 <- ggplot(data_long3, aes(x = HUCID_num, y = percentage, fill = variable)
 
 ##extract data
 ```{r}
-#Extract fire layer to just streams
-#fireStreams <- extract(contFireRisk, AllSierras_DamCapacity, xy = TRUE, touches = TRUE)
-#fireStreams <- fireStreams[,c(3,4,2)] #reorder for Rast function
-#fireStreams <- rast(fireStreams, type = 'xyz')
-#wkt <- crs(contFireRisk)
-#crs(fireStreams) <- wkt
-
+#Extract fire layer to just hq streams
+plot(fireStreams)
 highRisk_Streamshq <- extract(highRisk, highquality, xy = TRUE, touches = TRUE)
 highRisk_Streamshq <- highRisk_Streamshq[,c(3,4,2)] #reorder for Rast function
-highRisk_Streamshq <- highRisk_Streamshq[complete.cases(highRisk_Streamshq), ]
 highRisk_Streamshq <- rast(highRisk_Streamshq, type = 'xyz')
 wkt <- crs(contFireRisk)
 crs(highRisk_Streamshq) <- wkt
+highRiskHighQualtest <- highRisk_Streamshq
+
+#make sure it's the right size
+waterStorage <- rast("waterStorage.tif")
+highRiskHighQualtest <- extend(highRiskHighQualtest, waterStorage)
 
 plot(highRiskHighQual)
 plot(waterStorage)
 
-#make sure it's the right size
-highRisk_Streamshq <- extend(highRisk_Streamshq, waterStorage)
-
 #save as raster
-writeRaster(highRisk_Streamshq, "highRiskHighQual.tif", overwrite=T)
+writeRaster(highRiskHighQualtest, "highRiskHighQual2.tif", overwrite=TRUE)
 
 #read in your data 
-highRiskHighQual <- rast("highRiskHighQual.tif")
+highRiskHighQual <- rast("highRiskHighQual2.tif")
 waterStorage <- rast("waterStorage.tif")
-waterStorage[(waterStorage[] == 0)] <- NA
-highRiskHighQual[(highRiskHighQual[] == 0)] <- NA
+waterStorage[is.na(waterStorage)] <- 0
+highRiskHighQual[is.na(highRiskHighQual)] <- 0
+waterStorage <- mask(waterStorage, WatershedBoundaries)
+highRiskHighQual <- mask(highRiskHighQual, WatershedBoundaries)
+
 r4 <- c(highRiskHighQual, waterStorage)
 names(r4) <- c("highRiskHighQual","waterStorage")
 ```
@@ -1615,11 +1653,11 @@ names(r4) <- c("highRiskHighQual","waterStorage")
 ##try with 4 colors
 ```{r cache=TRUE}
 # Define the number of breaks
-nBreaks <- 3
+nBreaks <- 4
 
 # Create the colour matrix
 col.matrixQ4 <- colmat(nbreaks = nBreaks, breakstyle = "quantile",
-                       xlab = "Water", ylab = "Fire", 
+                       xlab = "Fire", ylab = "Water", 
                       bottomright = "#C85A5A", upperright = "#574249",
                        bottomleft = "#E8E8E8", upperleft = "#64ACBE",
                        saveLeg = TRUE, plotLeg = TRUE)
@@ -1647,15 +1685,18 @@ bivMapDFQ4 <- melt(bivMapDFQ4, id.vars = c("x", "y"),
 
 plot(bivmapQ4)
 # Make the map using ggplot
-map_q4 <- ggplot() +
-    geom_raster(data = bivMapDFQ4, aes(x = x, y = y, fill = bivVal)) +
+
+
+
+map_q5 <- ggplot() +
+    geom_tile(data = bivMapDFQ4, aes(x = x, y = y, fill = bivVal)) +
       scale_fill_gradientn(colours = col.matrixQ4, na.value = "transparent") + 
-    #geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
+    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
     theme_classic() + theme(panel.grid.major = element_blank(),
                             panel.grid.minor = element_blank()) +
     theme(text = element_text(size = 10, colour = "black")) +
     borders(colour = "black", size = 0.1) +
-    coord_quickmap() +
+    coord_sf() +
     theme(legend.position = "none",
           plot.background = element_blank(),
           strip.text = element_blank(), 
@@ -1663,8 +1704,7 @@ map_q4 <- ggplot() +
           #axis.text = element_blank(),
           axis.title = element_blank())
 
-map_q4 <- map_q4 + inset_element(BivLegend, 0, 0, 0.2, 0.3)
-
+map_q5 <- map_q5 + inset_element(BivLegend, 0, 0, 0.3, 0.2)
 ```
 ##post processing
 ```{r}
@@ -1857,11 +1897,16 @@ watersheds <- st_drop_geometry(watersheds)
 
 watershedstest <- watersheds %>%
     group_by(HUCID) %>% 
-    summarise(normVol = mean(VolumePerKm)) 
+    summarise(normVol = mean(VolumePerKm), 
+              meanDamCap = mean(oCC_EX),
+              meanHistDamCap = mean(oCC_HPE),
+              meanHistRemain = mean(mCC_EXvHPE, na.rm=T)) 
 
 WatershedBoundaries <- merge(WatershedBoundaries, watershedstest, by = "HUCID")
-
+watershed_csv <- st_drop_geometry(WatershedBoundaries)
+write.csv(watershed_csv, "watershed_csv.csv", row.names = TRUE)
 saveRDS(WatershedBoundaries,"WatershedBoundaries.rds")
+WatershedBoundaries <- readRDS('WatershedBoundaries.rds')
 ```
 
 
@@ -1928,11 +1973,35 @@ firerisk_normalized_Streamshq_plot <- ggplot() +
 firerisk_normalized_Streamshq_plot <- ggplot() +
    # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, aes(fill = (firerisk_normalized_Streamshq)), lwd = 0.1) +
-    scale_fill_gradient(low = "#e8e8e8", high ="#c85a5a", name = "Potential Fire Resilience \n(% of high risk areas)")+
+    scale_fill_gradient(low = "#e8e8e8", high ="#c85a5a", name = "% of High Risk Areas")+
     theme_minimal()+
-    ggtitle(expression(paste("% Area High-Risk-High-Capacity"))) +
+    ggtitle(expression(paste("Potential Fire Resilience"))) +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20),
+          legend.title.align= 0.5)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+    #theme(element_text(size=10),legend.position = c(.15,.2))+
+    #labs(color = "dams/km", size=10)+
+    theme(panel.border = element_rect(colour = "black", fill=NA))
+
+firerisk_plot <- ggplot() +
+   # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = WatershedBoundaries, aes(fill = (firerisk_normalized_Streamshq)), lwd = 0.1) +
+    scale_fill_gradient(low = "#e8e8e8", high ="#be64ac", name = "% Area\nWHP>2000")+
+    theme_minimal()+
+    ggtitle(expression(paste("Fire Risk"))) +
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20),
+          legend.title.align= 0.5)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
     #theme(element_text(size=10),legend.position = c(.15,.2))+
     #labs(color = "dams/km", size=10)+
     theme(panel.border = element_rect(colour = "black", fill=NA))
@@ -1940,14 +2009,45 @@ firerisk_normalized_Streamshq_plot <- ggplot() +
 normVol_plot <- ggplot() +
   geom_sf(data = WatershedBoundaries) +
   geom_sf(data = WatershedBoundaries, aes(fill = normVol), inherit.aes = FALSE) +
-  scale_fill_gradient(low = "#e8e8e8", high = "#64abce", name = "Potential Water Storage \n(m3/km)")+
+  scale_fill_gradient(low = "#e8e8e8", high = "#64abce", name = "Potential Water \nStorage (m3/km)")+
   xlab(NULL)+
   ylab(NULL)+
-  ggtitle(expression(paste("Potential Water Storage (m3/km)"))) + 
+  ggtitle(expression(paste("Potential Water Storage"))) + 
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5)) +
+          plot.subtitle = element_text(hjust = 0.5)) + 
+  theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20),
+          legend.title.align= 0.5)+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
   theme(panel.border = element_rect(colour = "black", fill=NA))
+
+ndcblue_plot <- ggplot() +
+  geom_sf(data = WatershedBoundaries) +
+  geom_sf(data = WatershedBoundaries, aes(fill = huc_ndc), inherit.aes = FALSE) +
+  scale_fill_gradient(low = "#e8e8e8", high = "#73ae80", name = "NDC", 
+                      limits = c(0, 30),
+                      oob = scales::squish,
+                      labels = c("0", "10", "20", "30+"))+
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("Water Deficit (NDC)"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5)) + 
+  theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20),
+          legend.title.align= 0.5)+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+```
+
+```{r}
+ (ndcblue_plot + normVol_plot) / (firerisk_plot + firerisk_normalized_Streamshq_plot)
 ```
 
 
