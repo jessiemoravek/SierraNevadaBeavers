@@ -40,10 +40,10 @@ WatershedBoundaries <- readRDS("WatershedBoundaries.rds")
 #PADUS_clip <- readRDS("PADUS_clip.rds")
 #PADUS_Gap12 <- readRDS("PADUS_Gap12.rds")
 #DamCap_GAP12 <- readRDS("DamCap_GAP12.rds")
-TNC_DamCapacity <- readRDS("TNC_DamCapacity.rds")
+#TNC_DamCapacity <- readRDS("TNC_DamCapacity.rds")
 contFireRisk <- readRDS("contFireRisk.rds")
 #contFireRisk <- readRDS("contFireRisk.rds")
-watershedsPoly <- readRDS("watershedsPoly.rds")
+#watershedsPoly <- readRDS("watershedsPoly.rds")
 #watersheds <- readRDS("watersheds.rds")
 
 ```
@@ -1620,7 +1620,6 @@ map_b3 <- ggplot(data_long3, aes(x = HUCID_num, y = percentage, fill = variable)
 ##extract data
 ```{r}
 #Extract fire layer to just hq streams
-plot(fireStreams)
 highRisk_Streamshq <- extract(highRisk, highquality, xy = TRUE, touches = TRUE)
 highRisk_Streamshq <- highRisk_Streamshq[,c(3,4,2)] #reorder for Rast function
 highRisk_Streamshq <- rast(highRisk_Streamshq, type = 'xyz')
@@ -1645,12 +1644,14 @@ waterStorage[is.na(waterStorage)] <- 0
 highRiskHighQual[is.na(highRiskHighQual)] <- 0
 waterStorage <- mask(waterStorage, WatershedBoundaries)
 highRiskHighQual <- mask(highRiskHighQual, WatershedBoundaries)
+#highRiskHighQual[(highRiskHighQual[]==0)] <- NA
+waterStorage[(waterStorage[]==0)] <- NA
 
 r4 <- c(highRiskHighQual, waterStorage)
 names(r4) <- c("highRiskHighQual","waterStorage")
 ```
 
-##try with 4 colors
+##YAY try with 4 colors
 ```{r cache=TRUE}
 # Define the number of breaks
 nBreaks <- 4
@@ -1691,7 +1692,7 @@ plot(bivmapQ4)
 map_q5 <- ggplot() +
     geom_tile(data = bivMapDFQ4, aes(x = x, y = y, fill = bivVal)) +
       scale_fill_gradientn(colours = col.matrixQ4, na.value = "transparent") + 
-    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
+    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA, color = '#939393') +
     theme_classic() + theme(panel.grid.major = element_blank(),
                             panel.grid.minor = element_blank()) +
     theme(text = element_text(size = 10, colour = "black")) +
@@ -1708,27 +1709,23 @@ map_q5 <- map_q5 + inset_element(BivLegend, 0, 0, 0.3, 0.2)
 ```
 ##post processing
 ```{r}
-colMatrix_rasValuesfireStreams %>%
+colMatrix_rasValueshighRiskHighQual %>%
   distinct(rasValue, HEX)
 
-show_col(colMatrix_rasValuesfireStreams$HEX)
+show_col(colMatrix_rasValueshighRiskHighQual$HEX)
 #HOOK UP THE COLOR WITH THE  HEX CODE and the  raster number 
 
 #check and see what it looks like
-plot(bivmapQ2)
-unique(bivmapQ2)
-#1	neither			
-#2	water			
-#5	fire			
-#6	both
+plot(bivmapQ4)
+unique(bivmapQ4)
+
 
 #hook up to watershed boundaries to aggregate by watershed
-WatershedBoundaries$bivmap <- exact_extract(bivmapQ2$fireStreams, WatershedBoundaries, 'frac')
-WatershedBoundaries$bivmap_mode <- exact_extract(bivmapQ2$fireStreams, WatershedBoundaries, 'mode')
-WatershedBoundaries$cat <- ifelse(WatershedBoundaries$bivmap_mode == 1,"neither",
-                       ifelse(WatershedBoundaries$bivmap_mode == 2,"water",
-                              ifelse(WatershedBoundaries$bivmap_mode == 5,"fire","both")))
+WatershedBoundaries$bivmap <- exact_extract(bivmapQ4$highRiskHighQual, WatershedBoundaries, 'frac')
+WatershedBoundaries$bivmap_mode <- exact_extract(bivmapQ4$highRiskHighQual, WatershedBoundaries, 'mode')
+WatershedBoundaries$cat <- ifelse(WatershedBoundaries$bivmap_mode == c(1,2),"neither",ifelse(WatershedBoundaries$bivmap_mode == c(3,4),"water", ifelse(WatershedBoundaries$bivmap_mode == c(17,18),"fire","both")))
 
+palette_biv2 <- colorRampPalette(colors = c("#574249", "#64ACBE", "#E8E8E8", "#C85A5A"))(4)
 
 map_w <- ggplot() +
   geom_sf(data = WatershedBoundaries, aes(fill = cat), na.rm=T) +
@@ -1744,8 +1741,46 @@ map_w <- ggplot() +
           #plot.subtitle = element_text(hjust = 0.5))+
   #theme(panel.border = element_rect(colour = "black", fill=NA))
 #So there are no watersheds where the majority of pixels are water (4) or both (1) 
+WatershedBoundariesdf4 <- st_drop_geometry(WatershedBoundaries)
+WatershedBoundariesdf4$frac_1 <- WatershedBoundariesdf4$bivmap[[1]]
+WatershedBoundariesdf4$frac_2 <- WatershedBoundariesdf4$bivmap[[2]]
+WatershedBoundariesdf4$frac_3 <- WatershedBoundariesdf4$bivmap[[3]]
+WatershedBoundariesdf4$frac_4 <- WatershedBoundariesdf4$bivmap[[4]]
+WatershedBoundariesdf4$frac_17<- WatershedBoundariesdf4$bivmap[[5]]
+WatershedBoundariesdf4$frac_18 <- WatershedBoundariesdf4$bivmap[[6]]
+WatershedBoundariesdf4$frac_19 <- WatershedBoundariesdf4$bivmap[[7]]
+WatershedBoundariesdf4$frac_20 <- WatershedBoundariesdf4$bivmap[[8]]
 
 
+
+WatershedBoundariesdf4 <- WatershedBoundariesdf4 %>%
+  mutate(HUCID_num = as.numeric(sub("^HUC ", "", as.character(HUCID)))) %>% 
+  mutate(HUCID_num = as.character(HUCID_num))
+
+
+data_long4 <- tidyr::pivot_longer(WatershedBoundariesdf4, cols = c(frac_1, frac_2, frac_3, frac_4, frac_17, frac_18, frac_19, frac_20), names_to = "variable", values_to = "percentage")
+
+# Plot
+map_b4 <- ggplot(data_long4, aes(x = HUCID_num, y = percentage, fill = variable)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c(
+    "frac_1" = "#E8E8E8", 
+    'frac_20' = "#574249", 
+    "frac_2" = "#BBD3DA", 
+    "frac_3" = "#90C0CC", 
+    "frac_4" = "#64ACBE", 
+    "frac_17" = "#C85a5a", 
+    "frac_18" = "#a25254", 
+    'frac_19' = "#7c4a4e")) +
+  labs(title = "Percentage of watershed in each category",
+       x = "HUC ID",
+       y = "Percentage") +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  theme(panel.grid = element_blank())+
+  theme(legend.position = "none"))
+
+ggsave("barplot4.png", plot = map_b4, width = 4, height = 4.5, units = "in")
 ```
 
 
@@ -1973,14 +2008,15 @@ firerisk_normalized_Streamshq_plot <- ggplot() +
 firerisk_normalized_Streamshq_plot <- ggplot() +
    # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, aes(fill = (firerisk_normalized_Streamshq)), lwd = 0.1) +
-    scale_fill_gradient(low = "#e8e8e8", high ="#c85a5a", name = "% of High Risk Areas")+
+    scale_fill_gradient(low = "#e8e8e8", high ="#c85a5a", name = "% of High \nRisk Areas")+
     theme_minimal()+
     ggtitle(expression(paste("Potential Fire Resilience"))) +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
-  theme(legend.text = element_text(size=8),
-          legend.title = element_text(size = 8),
+  theme(legend.text = element_text(size=7),
+          legend.title = element_text(size = 7),
           legend.position = c(.2,.20),
+          legend.key.size = unit(.8, "lines"),
           legend.title.align= 0.5)+
     theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
@@ -1991,14 +2027,15 @@ firerisk_normalized_Streamshq_plot <- ggplot() +
 firerisk_plot <- ggplot() +
    # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, aes(fill = (firerisk_normalized_Streamshq)), lwd = 0.1) +
-    scale_fill_gradient(low = "#e8e8e8", high ="#be64ac", name = "% Area\nWHP>2000")+
+    scale_fill_gradient(low = "#e8e8e8", high ="#FFA500", name = "% Area\nWHP>2000")+
     theme_minimal()+
     ggtitle(expression(paste("Fire Risk"))) +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
-    theme(legend.text = element_text(size=8),
-          legend.title = element_text(size = 8),
+   theme(legend.text = element_text(size=7),
+          legend.title = element_text(size = 7),
           legend.position = c(.2,.20),
+          legend.key.size = unit(.8, "lines"),
           legend.title.align= 0.5)+
     theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
@@ -2016,9 +2053,10 @@ normVol_plot <- ggplot() +
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) + 
-  theme(legend.text = element_text(size=8),
-          legend.title = element_text(size = 8),
+  theme(legend.text = element_text(size=7),
+          legend.title = element_text(size = 7),
           legend.position = c(.2,.20),
+          legend.key.size = unit(.8, "lines"),
           legend.title.align= 0.5)+
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
@@ -2026,7 +2064,7 @@ normVol_plot <- ggplot() +
 
 ndcblue_plot <- ggplot() +
   geom_sf(data = WatershedBoundaries) +
-  geom_sf(data = WatershedBoundaries, aes(fill = huc_ndc), inherit.aes = FALSE) +
+  geom_sf(data = WatershedBoundaries, aes(fill = huc_ndc.x), inherit.aes = FALSE) +
   scale_fill_gradient(low = "#e8e8e8", high = "#73ae80", name = "NDC", 
                       limits = c(0, 30),
                       oob = scales::squish,
@@ -2037,9 +2075,10 @@ ndcblue_plot <- ggplot() +
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) + 
-  theme(legend.text = element_text(size=8),
-          legend.title = element_text(size = 8),
+  theme(legend.text = element_text(size=7),
+          legend.title = element_text(size = 7),
           legend.position = c(.2,.20),
+          legend.key.size = unit(.8, "lines"),
           legend.title.align= 0.5)+
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
@@ -2048,6 +2087,8 @@ ndcblue_plot <- ggplot() +
 
 ```{r}
  (ndcblue_plot + normVol_plot) / (firerisk_plot + firerisk_normalized_Streamshq_plot)
+ ndcblue_plot + normVol_plot + firerisk_plot + firerisk_normalized_Streamshq_plot
+
 ```
 
 
@@ -2061,11 +2102,11 @@ y_value = 1
 #Vertical black line represents % high fire risk = 0.2, which is the mean
 #horizontal black line represents NDC <1, indicating watersheds with no water deficit
 ggplot()+
-  geom_point(data = WatershedBoundaries, aes(x = firerisk_normalized, y = (huc_ndc), size = normVol, color = firerisk_normalized_Streamshq))+ 
+  geom_point(data = WatershedBoundaries, aes(x = firerisk_normalized, y = (huc_ndc.x), size = normVol, color = firerisk_normalized_Streamshq))+ 
   geom_vline(xintercept = x_value, color = "black", linetype = "solid") +
   geom_hline(yintercept = y_value, color = "black", linetype = "solid") +
   #geom_text(data = WatershedBoundaries, aes(x = firerisk_normalized, y = huc_ndc, label = HUCID), vjust = -1.5, size = 2) +
-  geom_text_repel(data = WatershedBoundaries, aes(x = firerisk_normalized, y = huc_ndc, label = HUCID), size = 2)+
+  geom_text_repel(data = WatershedBoundaries, aes(x = firerisk_normalized, y = huc_ndc.x, label = HUCID), size = 2)+
   theme_minimal()+
   scale_color_gradient(low = "#e8e8e8", high ="#c85a5a", name = "Potential % Area \nw/ Fire Resilience")+
   scale_y_continuous(labels = function(x) format(x, scientific = FALSE), trans = "log10")+
