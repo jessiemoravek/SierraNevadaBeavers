@@ -48,6 +48,10 @@ contFireRisk <- readRDS("contFireRisk.rds")
 
 ```
 
+```{r}
+sum(AllSierras_DamCapacity$volume)
+sum(WatershedBoundaries$area_km2_Streamshq)
+```
 
 
 ##Background
@@ -2125,7 +2129,9 @@ ggplot()+
 selection <- WatershedBoundaries %>% 
   filter(HUCID %in% c("16050201","18040012","18040010", "18040013", "18020126","18020129", "18020125", "18040008", "18030001", "16050102"))
 
-selection
+summary(selection$normVol)
+summary(selection$firerisk_normalized_Streamshq   )
+
 
 ndc_selection <- ggplot() +
    # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
