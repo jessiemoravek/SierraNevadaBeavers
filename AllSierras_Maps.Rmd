@@ -50,7 +50,11 @@ contFireRisk <- readRDS("contFireRisk.rds")
 
 ```{r}
 sum(AllSierras_DamCapacity$volume)
+summary(AllSierras_DamCapacity$volume)
+hist(AllSierras_DamCapacity$volume)
 sum(WatershedBoundaries$area_km2_Streamshq)
+summary(WatershedBoundaries$area_km2_Streamshq)
+
 ```
 
 
@@ -1658,7 +1662,7 @@ names(r4) <- c("highRiskHighQual","waterStorage")
 ##YAY try with 4 colors
 ```{r cache=TRUE}
 # Define the number of breaks
-nBreaks <- 4
+nBreaks <- 2
 
 # Create the colour matrix
 col.matrixQ4 <- colmat(nbreaks = nBreaks, breakstyle = "quantile",
@@ -1711,7 +1715,143 @@ map_q5 <- ggplot() +
 
 map_q5 <- map_q5 + inset_element(BivLegend, 0, 0, 0.3, 0.2)
 ```
-##post processing
+##post processing 4 colors
+```{r}
+colMatrix_rasValueshighRiskHighQual %>%
+  distinct(rasValue, HEX)
+#1	#E8E8E8			
+#2	#64ACBE	blue	
+#5	#C85A5A		red
+#6	#574249  purple
+
+show_col(colMatrix_rasValueshighRiskHighQual$HEX)
+#HOOK UP THE COLOR WITH THE  HEX CODE and the  raster number 
+
+#check and see what it looks like
+plot(bivmapQ4)
+unique(bivmapQ4)
+
+
+#hook up to watershed boundaries to aggregate by watershed
+WatershedBoundaries$bivmap <- exact_extract(bivmapQ4$highRiskHighQual, WatershedBoundaries, 'frac')
+WatershedBoundaries$bivmap_mode <- exact_extract(bivmapQ4$highRiskHighQual, WatershedBoundaries, 'mode')
+WatershedBoundaries$cat <- ifelse(WatershedBoundaries$bivmap_mode == 1,"neither",ifelse(WatershedBoundaries$bivmap_mode == 2,"water", ifelse(WatershedBoundaries$bivmap_mode == 5,"fire","both")))
+
+palette_biv2 <- colorRampPalette(colors = c("#574249", "#64ACBE", "#E8E8E8", "#C85A5A"))(4)
+
+map_w <- ggplot() +
+  geom_sf(data = WatershedBoundaries, aes(fill = cat), na.rm=T) +
+  scale_fill_manual(values=palette_biv2) + 
+  xlab(NULL)+
+  ylab(NULL)+
+  #ggtitle(expression(paste("Majority of Area in Watershed"))) + 
+  theme_minimal() +
+  theme(panel.grid.major = element_line(colour = "transparent")) +
+  theme(axis.text.x = element_blank(), axis.text.y = element_blank()) +
+  theme(legend.position = "none")
+  #theme(plot.title = element_text(hjust = 0.5, size = 12),
+          #plot.subtitle = element_text(hjust = 0.5))+
+  #theme(panel.border = element_rect(colour = "black", fill=NA))
+#So there are no watersheds where the majority of pixels are water (4) or both (1) 
+WatershedBoundariesdf4 <- st_drop_geometry(WatershedBoundaries)
+WatershedBoundariesdf4$frac_1 <- WatershedBoundariesdf4$bivmap[[1]]
+WatershedBoundariesdf4$frac_2 <- WatershedBoundariesdf4$bivmap[[2]]
+WatershedBoundariesdf4$frac_5 <- WatershedBoundariesdf4$bivmap[[3]]
+WatershedBoundariesdf4$frac_6 <- WatershedBoundariesdf4$bivmap[[4]]
+
+WatershedBoundariesdf4 <- WatershedBoundariesdf4 %>%
+  mutate(HUCID_num = as.numeric(sub("^HUC ", "", as.character(HUCID)))) %>% 
+  mutate(HUCID_num = as.character(HUCID_num))
+
+data_long4 <- tidyr::pivot_longer(WatershedBoundariesdf4, cols = c(frac_1, frac_2, frac_5, frac_6), names_to = "variable", values_to = "percentage")
+
+data_long4_summary <- data_long4 %>%
+  filter(variable == "frac_6") 
+summary(data_long4_summary$percentage)
+hist(data_long4_summary$percentage)
+data_long4_summary <- data_long4_summary[order(data_long4_summary$percentage, decreasing = TRUE),]
+```
+
+
+```{r}
+
+bold_labels <-c("18040011","18020125","18040012", "18020126", "18020128","18020129", "18040013")
+
+colorado <- function(src, boulder) {
+  if (!is.factor(src)) src <- factor(src)                   # make sure it's a factor
+  src_levels <- levels(src)                                 # retrieve the levels in their order
+  brave <- boulder %in% src_levels                          # make sure everything we want to make bold is actually in the factor levels
+  if (all(brave)) {                                         # if so
+    b_pos <- purrr::map_int(boulder, ~which(.==src_levels)) # then find out where they are
+    b_vec <- rep("plain", length(src_levels))               # make'm all plain first
+    b_vec[b_pos] <- "bold"                                  # make our targets bold
+    b_vec                                                   # return the new vector
+  } else {
+    stop("All elements of 'boulder' must be in src")
+  }
+}
+
+# Plot
+map_b4 <- ggplot(data_long4, aes(x = HUCID_num, y = percentage, fill = variable)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c(
+    "frac_1" = "#E8E8E8", 
+    'frac_2' = "#64ACBE", 
+    "frac_5" = "#C85A5A", 
+    "frac_6" = "#574249" 
+    )) +
+  labs(title = "Percentage of streams in each category",
+       x = "HUC ID",
+       y = "Percentage") +
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  theme(axis.text.x=element_text(face=colorado(data_long4$HUCID_num, c("18040011","18020125","18040012", "18020126", "18020128","18020129", "18040013", '18010122'))))+
+  theme(panel.grid = element_blank())+
+  theme(legend.position = "none")
+
+ggsave("barplot4.png", plot = map_b4, width = 4, height = 4.5, units = "in", dpi=300)
+
+
+```
+##Figure
+```{r}
+selection1 <- WatershedBoundaries %>% 
+  filter(HUCID %in% c("18040011","18020125","18040012", "18020126", "18020128","18020129", "18040013", '18010122'))
+
+
+map_q6 <- ggplot() +
+    geom_tile(data = bivMapDFQ4, aes(x = x, y = y, fill = bivVal)) +
+      scale_fill_gradientn(colours = col.matrixQ4, na.value = "transparent") + 
+    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA, color = '#939393') +
+    geom_sf(data = selection1, fill = NA, lwd = .55) +
+    theme_classic() + theme(panel.grid.major = element_blank(),
+                            panel.grid.minor = element_blank()) +
+    theme(text = element_text(size = 18, colour = "black")) +
+    borders(colour = "black", size = 0.1) +
+    coord_sf() +
+    theme(legend.position = "none",
+          plot.background = element_blank(),
+          strip.text = element_blank(), 
+          #axis.text.y = element_blank(),
+          #axis.text = element_blank(),
+          axis.title = element_blank())
+
+map_q6 <- map_q6 + inset_element(BivLegend, 0, .1, 0.3, 0.2)
+
+ggsave("map_q6.png", plot = map_q6, width = 7.6, height = 4.69, units = "in", dpi = 300)
+```
+
+
+```{r}
+library(Cairo)
+png(filename = "map_q6png.png", width = 7.6, height = 4.69, units = "in", type = "cairo", res = 800) 
+map_q6
+dev.off()
+while (!is.null(dev.list()))  dev.off()
+```
+
+
+##post processing 16 colors
 ```{r}
 colMatrix_rasValueshighRiskHighQual %>%
   distinct(rasValue, HEX)
