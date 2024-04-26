@@ -45,8 +45,12 @@ contFireRisk <- readRDS("contFireRisk.rds")
 #contFireRisk <- readRDS("contFireRisk.rds")
 #watershedsPoly <- readRDS("watershedsPoly.rds")
 #watersheds <- readRDS("watersheds.rds")
+intermittent <- readRDS("intermittent.rds")
 
 ```
+
+
+
 
 ```{r}
 sum(AllSierras_DamCapacity$volume)
@@ -56,7 +60,24 @@ sum(WatershedBoundaries$area_km2_Streamshq)
 summary(WatershedBoundaries$area_km2_Streamshq)
 
 ```
+##Intermittent
+```{r}
+# Read in the shapefile with st_read()
+intermittent <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/AllSierras_DamCapacity_Intermittent2.shp")
 
+#remove unneeded shapefiles
+file.remove(list.files(pattern = "AllSierras_DamCapacity_Intermittent*",recursive = F))
+
+# Read in shapefile from previously imported shapefile
+intermittent <- readRDS("intermittent.rds")
+
+crs(intermittent)
+
+#Project to wkt (NASA projection)
+intermittent <- st_transform(intermittent, 3310)
+intermittent <- st_transform(intermittent, wkt)
+saveRDS(intermittent,"intermittent.rds")
+```
 
 ##Background
 ```{r eval=FALSE, include=FALSE}
@@ -197,6 +218,93 @@ veg <- ggplot() +
         panel.grid.minor = element_blank())+
     labs(color = "Vegetation\nChange")+
     theme(panel.border = element_rect(colour = "black", fill=NA)) 
+```
+#Intermittent
+##Current intermittent volume calculation
+```{r}
+for (i in intermittent){ #for each stream segment in the BRAT model output shapefile
+  damCt <- intermittent$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_EX_CT in the attribute table)
+  slope <- intermittent$iGeo_Slope #meters
+  da <- intermittent$iGeo_DA #m2
+  width <- ifelse(da < 4.95,2.18*(da)^0.191,
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
+  height <- 1 #assume all beaver dams are 1m tall
+  length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
+  maxLength<- (intermittent$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
+  volume <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt))
+  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damCt),(width)*(maxLength)*(damCt))
+  intermittent$width <- width
+  intermittent$volume <- volume #m3
+  intermittent$surfaceArea <- surfaceArea #m2
+} 
+```
+
+##Historical intermittent volume calculation
+```{r}
+for (i in intermittent){ #for each stream segment in the BRAT model output shapefile
+  damCt <- intermittent$mCC_HPE_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_HPE_CT in the attribute table)
+  slope <- intermittent$iGeo_Slope #meters
+  da <- intermittent$iGeo_DA #m2
+  width <- ifelse(da < 4.95,2.18*(da)^0.191,
+                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
+  height <- 1 #assume all beaver dams are 1m tall
+  length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
+  maxLength<- (intermittent$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
+  volumeHist <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt))
+  surfaceAreaHist <- ifelse(length < maxLength, (width)*(length)*(damCt),(width)*(maxLength)*(damCt))
+  intermittent$width <- width
+  intermittent$volumeHist <- volumeHist #m3
+  intermittent$surfaceAreaHist <- surfaceAreaHist #m2
+} 
+
+```
+
+##Current Intermittent Dam Capacity Map
+```{r}
+#scales::show_col(palette_new)
+
+ci <- ggplot() +
+    #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = transform(intermittent, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
+    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
+    scale_color_manual(values=palette_new,
+                        labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
+    theme_minimal()+
+    ggtitle(expression(paste("Current Dam Capacity"))) +
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20))+
+    #theme(element_text(size=10),legend.position = c(.15,.2))+
+    labs(color = "dams/km", size=10)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+    theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+
+##Historical Intermittent Dam Capacity Map
+```{r}
+h <- ggplot() +
+    #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = transform(intermittent, DamCapacity=cut(oCC_HPE, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
+    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
+    scale_color_manual(values=palette_new,
+                        labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
+    theme_minimal()+
+    ggtitle(expression(paste("Historical Dam Capacity"))) +
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20))+
+    #theme(element_text(size=10),legend.position = c(.15,.2))+
+    labs(color = "dams/km", size=10)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+    theme(panel.border = element_rect(colour = "black", fill=NA))
+
 ```
 
 #Change in volume
