@@ -63,7 +63,7 @@ summary(WatershedBoundaries$area_km2_Streamshq)
 ##Intermittent
 ```{r}
 # Read in the shapefile with st_read()
-intermittent <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/AllSierras_DamCapacity_Intermittent2.shp")
+intermittent <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/AllSierras_DamCapacity_Intermittent5.shp")
 
 #remove unneeded shapefiles
 file.remove(list.files(pattern = "AllSierras_DamCapacity_Intermittent*",recursive = F))
@@ -71,11 +71,11 @@ file.remove(list.files(pattern = "AllSierras_DamCapacity_Intermittent*",recursiv
 # Read in shapefile from previously imported shapefile
 intermittent <- readRDS("intermittent.rds")
 
-crs(intermittent)
+crs(AllSierras_DamCapacity) ==crs(intermittent)
 
 #Project to wkt (NASA projection)
 intermittent <- st_transform(intermittent, 3310)
-intermittent <- st_transform(intermittent, wkt)
+
 saveRDS(intermittent,"intermittent.rds")
 ```
 
@@ -270,7 +270,7 @@ ci <- ggplot() +
     scale_color_manual(values=palette_new,
                         labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
     theme_minimal()+
-    ggtitle(expression(paste("Current Dam Capacity"))) +
+    ggtitle(expression(paste("Intermittent Stream Dam Capacity"))) +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
     theme(legend.text = element_text(size=8),
@@ -306,6 +306,39 @@ h <- ggplot() +
     theme(panel.border = element_rect(colour = "black", fill=NA))
 
 ```
+
+##combine intermittent with perennial network
+```{r}
+intermittent$flow <- "intermittent"
+sum(intermittent$flow == "intermittent")
+intermittent_selection <- intermittent[,c("geometry","flow")]
+
+test <- st_join(AllSierras_DamCapacity, intermittent_selection, join= st_overlaps)
+unique(test$flow)
+sum(test$flow =="intermittent", na.rm=T)
+
+
+test2 <- dplyr::distinct(test)
+
+unique(st_is_valid(AllSierras_DamCapacity))
+unique(st_is_valid(test2))
+
+
+
+test$flow <- ifelse(is.na(test$flow), "perennial", test$flow)
+unique(test$flow)
+
+```
+#percentages
+```{r}
+zero <- test %>% 
+  filter(oCC_EX == 0) 
+
+sum(zero$flow == "perennial")
+sum(zero$flow == "intermittent")
+```
+
+
 
 #Change in volume
 ##Historical volume calculation
