@@ -45,7 +45,7 @@ contFireRisk <- readRDS("contFireRisk.rds")
 #contFireRisk <- readRDS("contFireRisk.rds")
 #watershedsPoly <- readRDS("watershedsPoly.rds")
 #watersheds <- readRDS("watersheds.rds")
-intermittent <- readRDS("intermittent.rds")
+#intermittent <- readRDS("intermittent.rds")
 
 ```
 
@@ -219,124 +219,11 @@ veg <- ggplot() +
     labs(color = "Vegetation\nChange")+
     theme(panel.border = element_rect(colour = "black", fill=NA)) 
 ```
-#Intermittent
-##Current intermittent volume calculation
-```{r}
-for (i in intermittent){ #for each stream segment in the BRAT model output shapefile
-  damCt <- intermittent$mCC_EX_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_EX_CT in the attribute table)
-  slope <- intermittent$iGeo_Slope #meters
-  da <- intermittent$iGeo_DA #m2
-  width <- ifelse(da < 4.95,2.18*(da)^0.191,
-                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
-  height <- 1 #assume all beaver dams are 1m tall
-  length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
-  maxLength<- (intermittent$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
-  volume <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt))
-  surfaceArea <- ifelse(length < maxLength, (width)*(length)*(damCt),(width)*(maxLength)*(damCt))
-  intermittent$width <- width
-  intermittent$volume <- volume #m3
-  intermittent$surfaceArea <- surfaceArea #m2
-} 
-```
-
-##Historical intermittent volume calculation
-```{r}
-for (i in intermittent){ #for each stream segment in the BRAT model output shapefile
-  damCt <- intermittent$mCC_HPE_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_HPE_CT in the attribute table)
-  slope <- intermittent$iGeo_Slope #meters
-  da <- intermittent$iGeo_DA #m2
-  width <- ifelse(da < 4.95,2.18*(da)^0.191,
-                  ifelse(da >= 4.95 & da < 377,1.41*(da)^0.462,7.18*(da)^0.183)) #based on Scamardo et al. 2022
-  height <- 1 #assume all beaver dams are 1m tall
-  length <- height/slope #trigonometry: slope = rise/run, so run = rise/slope
-  maxLength<- (intermittent$iGeo_Len/damCt) #set a maximum length so that we can change volume calculations if there are so many dams that they all run together
-  volumeHist <- ifelse(length < maxLength, 0.5*(height)*(width)*(length)*(damCt),(height)*(width)*(maxLength)*(damCt))
-  surfaceAreaHist <- ifelse(length < maxLength, (width)*(length)*(damCt),(width)*(maxLength)*(damCt))
-  intermittent$width <- width
-  intermittent$volumeHist <- volumeHist #m3
-  intermittent$surfaceAreaHist <- surfaceAreaHist #m2
-} 
-
-```
-
-##Current Intermittent Dam Capacity Map
-```{r}
-#scales::show_col(palette_new)
-
-ci <- ggplot() +
-    #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
-    geom_sf(data = transform(intermittent, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
-    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
-    scale_color_manual(values=palette_new,
-                        labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
-    theme_minimal()+
-    ggtitle(expression(paste("Intermittent Stream Dam Capacity"))) +
-    theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5)) +
-    theme(legend.text = element_text(size=8),
-          legend.title = element_text(size = 8),
-          legend.position = c(.2,.20))+
-    #theme(element_text(size=10),legend.position = c(.15,.2))+
-    labs(color = "dams/km", size=10)+
-    theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())+
-    theme(panel.border = element_rect(colour = "black", fill=NA))
-
-```
-
-##Historical Intermittent Dam Capacity Map
-```{r}
-h <- ggplot() +
-    #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
-    geom_sf(data = transform(intermittent, DamCapacity=cut(oCC_HPE, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
-    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
-    scale_color_manual(values=palette_new,
-                        labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
-    theme_minimal()+
-    ggtitle(expression(paste("Historical Dam Capacity"))) +
-    theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5)) +
-    theme(legend.text = element_text(size=8),
-          legend.title = element_text(size = 8),
-          legend.position = c(.2,.20))+
-    #theme(element_text(size=10),legend.position = c(.15,.2))+
-    labs(color = "dams/km", size=10)+
-    theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())+
-    theme(panel.border = element_rect(colour = "black", fill=NA))
-
-```
-
-##combine intermittent with perennial network
-```{r}
-intermittent$flow <- "intermittent"
-sum(intermittent$flow == "intermittent")
-intermittent_selection <- intermittent[,c("geometry","flow")]
-
-test <- st_join(AllSierras_DamCapacity, intermittent_selection, join= st_overlaps)
-unique(test$flow)
-sum(test$flow =="intermittent", na.rm=T)
-
-
-test2 <- dplyr::distinct(test)
-
-unique(st_is_valid(AllSierras_DamCapacity))
-unique(st_is_valid(test2))
 
 
 
-test$flow <- ifelse(is.na(test$flow), "perennial", test$flow)
-unique(test$flow)
 
-```
-#percentages
-```{r}
-zero <- test %>% 
-  filter(oCC_EX == 0) 
 
-sum(zero$flow == "perennial")
-sum(zero$flow == "intermittent")
-```
 
 
 
@@ -676,6 +563,199 @@ result <- as.data.frame(fireExtract) %>%
          `area km^2` = round(`area m^2`/1e6,2)) 
 #1365 km2 of fire resilience conferred 
 ```
+
+#Intermittent
+##Assign Perennial
+```{r}
+AllSierras_DamCapacity$Flow <- ifelse(is.na(AllSierras_DamCapacity$Flow), "perennial", AllSierras_DamCapacity$Flow)
+
+```
+
+##percentages
+```{r}
+#% of total stream km
+intermittent <- AllSierras_DamCapacity %>% 
+  filter(Flow == "intermittent") 
+intermittent_length <- sum(intermittent$iGeo_Len) #m
+total_length <- sum(AllSierras_DamCapacity$iGeo_Len)
+pct_total_intermittent <- intermittent_length/total_length
+
+#% of 0 dams/km
+zero <- AllSierras_DamCapacity %>% 
+  filter(oCC_EX == 0) 
+pct_zero_intermittent = (sum(zero$Flow == "intermittent"))/(nrow(zero))
+
+zero_intermittent_len <- intermittent %>% 
+  filter(oCC_EX == 0) 
+zero_intermittent_len <- sum(zero_intermittent_len$iGeo_Len) #m
+pct_zero_intermittent_len <- zero_intermittent_len/total_length
+
+
+#% of 1-2 dams/km
+one_two <- AllSierras_DamCapacity %>% 
+  filter(oCC_EX >= 1 & oCC_EX <= 2) 
+pct_one_two_intermittent = (sum(one_two$Flow == "intermittent"))/(nrow(one_two))
+
+one_two_intermittent_len <- intermittent %>% 
+  filter(oCC_EX >= 1 & oCC_EX <= 2) 
+one_two_intermittent_len <- sum(one_two_intermittent_len$iGeo_Len) #m
+pct_one_two_intermittent_len <- one_two_intermittent_len/total_length
+
+
+#% of 2-5 dams/km
+two_five <- AllSierras_DamCapacity %>% 
+  filter(oCC_EX > 2 & oCC_EX <= 5) 
+pct_two_five_intermittent = (sum(two_five$Flow == "intermittent"))/(nrow(two_five))
+
+two_five_intermittent_len <- intermittent %>% 
+  filter(oCC_EX > 2 & oCC_EX <= 5) 
+two_five_intermittent_len <- sum(two_five_intermittent_len$iGeo_Len) #m
+pct_two_five_intermittent_len <- two_five_intermittent_len/total_length
+
+
+#% of 5-15 dams/km
+five_fifteen <- AllSierras_DamCapacity %>% 
+  filter(oCC_EX > 5 & oCC_EX <= 15) 
+pct_five_fifteen_intermittent = (sum(five_fifteen$Flow == "intermittent"))/(nrow(five_fifteen))
+
+five_fifteen_intermittent_len <- intermittent %>% 
+  filter(oCC_EX > 5 & oCC_EX <= 15) 
+five_fifteen_intermittent_len <- sum(five_fifteen_intermittent_len$iGeo_Len) #m
+pct_five_fifteen_intermittent_len <- five_fifteen_intermittent_len/total_length
+
+
+#% of 15-40 dams/km
+fifteen_forty <- AllSierras_DamCapacity %>% 
+  filter(oCC_EX > 15 & oCC_EX <= 40) 
+pct_fifteen_forty_intermittent = (sum(fifteen_forty$Flow == "intermittent"))/(nrow(fifteen_forty))
+
+fifteen_forty_intermittent_len <- intermittent %>% 
+  filter(oCC_EX > 15 & oCC_EX <= 40) 
+fifteen_forty_intermittent_len <- sum(fifteen_forty_intermittent_len$iGeo_Len) #m
+pct_fifteen_forty_intermittent_len <- fifteen_forty_intermittent_len/total_length
+
+```
+
+##Current Intermittent Dam Capacity Map
+```{r}
+#scales::show_col(palette_new)
+
+ci <- ggplot() +
+    #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = transform(intermittent, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
+    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
+    scale_color_manual(values=palette_new,
+                        labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
+    theme_minimal()+
+    ggtitle(expression(paste("Intermittent Stream Dam Capacity"))) +
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20))+
+    #theme(element_text(size=10),legend.position = c(.15,.2))+
+    labs(color = "dams/km", size=10)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+    theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+##percent intermittent water storage
+```{r}
+intermittent_water <- sum(intermittent$volume) #m
+total_water <- sum(AllSierras_DamCapacity$volume)
+pct_water_intermittent <- intermittent_water/total_water 
+
+```
+
+##percent intermittent fire resilience
+```{r}
+##pull high quality areas
+highquality_int <- subset(intermittent, oCC_EX >= 5) #pull out good habitat
+
+#pull high risk areas (from above)
+#highRisk <- contFireRisk
+#highRisk[highRisk[] < 2000] = NA 
+#plot(highRisk, zlim = c(0,70), main = "Filtered raster")
+
+
+riskExtract_int <- extract(highRisk, highquality_int, xy = TRUE, touches = TRUE)
+riskExtract_int <- riskExtract_int[,c(3,4,2)] #reorder for Rast function
+riskExtract_int <- rast(riskExtract_int, type = 'xyz')
+wkt <- crs(contFireRisk)
+crs(riskExtract_int) <- wkt
+
+hq <- ggplot() +
+  geom_spatraster(data = riskExtract, aes(fill = Band_1)) +
+  scale_fill_viridis_c(option = "inferno",na.value = "transparent") +
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("High Fire Risk and High Dam Capacity"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5))+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+summary(riskExtract)
+
+result_int <- as.data.frame(riskExtract_int) %>%
+  summarise(pixels = n()) %>% 
+  mutate(`area m^2` = pixels * 270 * 270, #multiply by pixel area
+         `area km^2` = round(`area m^2`/1e6,2)) 
+
+intermittent_fire <- sum(result_int$`area km^2`) #m
+total_fire <- sum(result$`area km^2`)
+pct_fire_intermittent <- intermittent_fire/total_fire 
+
+
+
+```
+##Historical Intermittent Dam Capacity Map
+```{r}
+h <- ggplot() +
+    #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = transform(intermittent, DamCapacity=cut(oCC_HPE, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
+    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
+    scale_color_manual(values=palette_new,
+                        labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
+    theme_minimal()+
+    ggtitle(expression(paste("Historical Dam Capacity"))) +
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20))+
+    #theme(element_text(size=10),legend.position = c(.15,.2))+
+    labs(color = "dams/km", size=10)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+    theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+
+##combine intermittent with perennial network
+```{r eval=FALSE, include=FALSE}
+intermittent$flow <- "intermittent"
+sum(intermittent$flow == "intermittent")
+intermittent_selection <- intermittent[,c("geometry","flow")]
+
+test <- st_join(AllSierras_DamCapacity, intermittent_selection, join= st_overlaps)
+unique(test$flow)
+sum(test$flow =="intermittent", na.rm=T)
+
+
+test2 <- dplyr::distinct(test)
+
+unique(st_is_valid(AllSierras_DamCapacity))
+unique(st_is_valid(test2))
+
+
+
+test$flow <- ifelse(is.na(test$flow), "perennial", test$flow)
+unique(test$flow)
+
+```
+
 #Watershed-Grouped Figures
 ##Apply to watersheds
 ```{r}
