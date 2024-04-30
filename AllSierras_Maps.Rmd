@@ -78,7 +78,21 @@ intermittent <- st_transform(intermittent, 3310)
 
 saveRDS(intermittent,"intermittent.rds")
 ```
+##iNAt Beavers
+```{r}
+# Read in the shapefile with st_read()
+beavers <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/inatbeavers.shp")
 
+#remove unneeded shapefiles
+file.remove(list.files(pattern = "inatbeavers*",recursive = F))
+
+crs(beavers) ==crs(AllSierras_DamCapacity)
+
+#Project to wkt (NASA projection)
+beavers <- st_transform(beavers, 3310)
+
+saveRDS(beavers,"beavers.rds")
+```
 ##Background
 ```{r eval=FALSE, include=FALSE}
 background <- states(cb = FALSE)
@@ -115,6 +129,32 @@ w <- ggplot() +
     theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
     theme(panel.border = element_rect(colour = "black", fill=NA))
+
+ggsave("Fig_watershedboundaries.png", plot = w, width = 6.8, height = 8, units = "in", bg = "white", dpi=300)
+
+```
+
+##Beavers
+
+```{r}
+palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
+
+beav <- ggplot() +
+    geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    #geom_sf(data = WatershedBoundaries, fill = "#b0b0b0", lwd = 0.1, alpha = 0.5 ) +
+    geom_sf(data = beavers, color = "black",size = .5)+
+    scale_color_manual(values=palette_new)+
+    theme_minimal()+
+    ggtitle(expression(paste("Watershed Boundaries"))) +
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    #theme(element_text(size=10),legend.position = c(.15,.2))+
+    #labs(color = "dams/km", size=10)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+    theme(panel.border = element_rect(colour = "black", fill=NA))
+
+ggsave("Fig_beavs.png", plot = beav, width = 6.8, height = 8, units = "in", bg = "white", dpi=300)
 
 ```
 
@@ -2486,6 +2526,135 @@ ggplot()+
         panel.grid.minor = element_blank())+
   theme(panel.border = element_rect(colour = "black", fill=NA))  
 ```
+#For presentation
+```{r}
+#Vertical black line represents % high fire risk = 0.2, which is the mean
+#horizontal black line represents NDC <1, indicating watersheds with no water deficit
+
+png(filename = "Fig_scatterplot.png", width = 8, height =5, units = "in", res = 800) 
+
+scatter <- ggplot()+
+  geom_point(data = WatershedBoundaries, aes(x = firerisk_normalized, y = (huc_ndc.x)))+ 
+  geom_vline(xintercept = x_value, color = "black", linetype = "solid") +
+  geom_hline(yintercept = y_value, color = "black", linetype = "solid") +
+  #geom_text(data = WatershedBoundaries, aes(x = firerisk_normalized, y = huc_ndc, label = HUCID), vjust = -1.5, size = 2) +
+  #geom_text_repel(data = WatershedBoundaries, aes(x = firerisk_normalized, y = huc_ndc.x, label = HUCID), size = 2)+
+  theme_minimal()+
+  #scale_color_gradient(low = "#e8e8e8", high ="#c85a5a", name = "Potential % Area \nw/ Fire Resilience")+
+  scale_y_continuous(labels = function(x) format(x, scientific = FALSE), trans = "log10")+
+  ggtitle(expression(paste("Water Deficit vs. Fire Risk"))) +
+  theme(plot.title = element_text(hjust = 0.5, size = 16),
+          plot.subtitle = element_text(hjust = 0.5, size = 14)) +
+    #theme(element_text(size=10),legend.position = c(.15,.2))+
+  labs(x = "% Watershed Area with High Fire Risk",
+       y = "Watershed-scale Water Deficit (NDC)")+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+  theme(axis.title.x = element_text(size = 14),  # Adjust the size of x-axis labels
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 12),  # Adjust the size of x-axis labels
+        axis.text.y = element_text(size = 12))+
+  theme(panel.border = element_rect(colour = "black", fill=NA)) 
+
+
+ggsave("Fig_scatterplot.png", plot = scatter, width = 8, height = 5, units = "in", bg = "white", dpi=300)
+
+```
+##Risk selection for presentation
+```{r}
+selection <- WatershedBoundaries %>% 
+  filter(HUCID %in% c("16050201","18040012","18040010", "18040013", "18020126","18020129", "18020125", "18040008", "18030001", "16050102"))
+
+
+selection_highpriority <- ggplot() +
+   # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = WatershedBoundaries, fill = NA, lwd = 0.1) +
+    geom_sf(data = selection, fill = "#6c83b5", lwd = .6) +
+    scale_fill_gradient(low = "#e8e8e8", high = "#64abce", name = "Potential Water Storage \n(m3/km)")+
+    theme_minimal()+
+    #ggtitle(expression(paste("Potential Water Storage"))) +
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5),
+          legend.key.size = unit(1, "lines")) +
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20),
+          legend.title.align= 0.5)+
+    #labs(color = "dams/km", size=10)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+    theme(panel.grid.major = element_line(colour = "transparent")) +
+    theme(axis.text.x = element_blank(), axis.text.y = element_blank()) 
+   # theme(panel.border = element_rect(colour = "black", fill=NA))
+
+ggsave("Fig_selection_highpriority.png", plot = selection_highpriority, width = 3, height = 5.3, units = "in", bg = "white", dpi=300)
+
+```
+##high potential for presentation
+```{r}
+selection1 <- WatershedBoundaries %>% 
+  filter(HUCID %in% c("18040011","18020125","18040012", "18020126", "18020128","18020129", "18040013", '18010122'))
+
+selection_highpotential <- ggplot() +
+   # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = WatershedBoundaries, fill = NA, lwd = 0.1) +
+    geom_sf(data = selection1, fill = "#73ae80", lwd = .6) +
+    theme_minimal()+
+    #ggtitle(expression(paste("Potential Water Storage"))) +
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5),
+          legend.key.size = unit(1, "lines")) +
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20),
+          legend.title.align= 0.5)+
+    #labs(color = "dams/km", size=10)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+    theme(panel.grid.major = element_line(colour = "transparent")) +
+    theme(axis.text.x = element_blank(), axis.text.y = element_blank()) 
+   # theme(panel.border = element_rect(colour = "black", fill=NA))
+
+ggsave("Fig_selection_highpotential.png", plot = selection_highpotential, width = 3, height = 5.3, units = "in", bg = "white", dpi=300)
+```
+
+```{r}
+selection <- WatershedBoundaries %>% 
+  filter(HUCID %in% c("16050201","18040012","18040010", "18040013", "18020126","18020129", "18020125", "18040008", "18030001", "16050102"))
+
+selection1 <- WatershedBoundaries %>% 
+  filter(HUCID %in% c("18040011","18020125","18040012", "18020126", "18020128","18020129", "18040013", '18010122'))
+
+selection2 <- WatershedBoundaries %>% 
+  filter(HUCID %in% c("18040012","18040013","18020126","18020129","18020125"))
+
+All <- ggplot() +
+   # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = WatershedBoundaries, fill = "#e8e8e8", lwd = 0.1) +
+    geom_sf(data = selection, fill = "#6c83b5", lwd = .1)+
+    geom_sf(data = selection1, fill = "#73ae80", lwd = .1) +
+  geom_sf(data = selection2, fill = "#2a5a5b", lwd = .1) +
+    theme_minimal()+
+    #ggtitle(expression(paste("Potential Water Storage"))) +
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5),
+          legend.key.size = unit(1, "lines")) +
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20),
+          legend.title.align= 0.5)+
+    #labs(color = "dams/km", size=10)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+    theme(panel.grid.major = element_line(colour = "transparent")) +
+    theme(axis.text.x = element_blank(), axis.text.y = element_blank()) 
+   # theme(panel.border = element_rect(colour = "black", fill=NA))
+
+ggsave("Fig_all.png", plot = All, width = 3, height = 5.3, units = "in", bg = "white", dpi=300)
+```
+
+
+
 ```{r}
 selection <- WatershedBoundaries %>% 
   filter(HUCID %in% c("16050201","18040012","18040010", "18040013", "18020126","18020129", "18020125", "18040008", "18030001", "16050102"))
