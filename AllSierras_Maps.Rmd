@@ -78,7 +78,7 @@ intermittent <- st_transform(intermittent, 3310)
 
 saveRDS(intermittent,"intermittent.rds")
 ```
-##iNAt Beavers
+##iNat Beavers
 ```{r}
 # Read in the shapefile with st_read()
 beavers <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/inatbeavers.shp")
@@ -92,6 +92,7 @@ crs(beavers) ==crs(AllSierras_DamCapacity)
 beavers <- st_transform(beavers, 3310)
 
 saveRDS(beavers,"beavers.rds")
+beavers <- readRDS("beavers.rds")
 ```
 ##Background
 ```{r eval=FALSE, include=FALSE}
@@ -102,10 +103,12 @@ background <- st_make_valid(background) %>%
   dplyr::filter(valid=="TRUE") 
 #^Millie's validation code...use later
 
-background <- background %>% filter(NAME == "California" | NAME == "Nevada")
+background <- background %>% filter(NAME == "California" | NAME == "Nevada" | NAME == "Oregon" | NAME == "Idaho" | NAME == "Utah" | NAME == "Arizona")
 background <- st_transform(background, 3310)
 box <- st_bbox(AllSierras_DamCapacity)
-background_crop <- st_crop(background, box)
+background_crop <- st_crop(background, beavers)
+background_crop <- st_crop(background, xmin = -124.5, xmax = -114,
+                                    ymin = 31.5, ymax = 42.5)
 
 saveRDS(background,"background.rds")
 ```
@@ -117,7 +120,7 @@ saveRDS(background,"background.rds")
 palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
 
 w <- ggplot() +
-    geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = background_crop, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, fill = "#b0b0b0", lwd = 0.1, alpha = 0.5 ) +
     scale_color_manual(values=palette_new)+
     theme_minimal()+
@@ -128,7 +131,8 @@ w <- ggplot() +
     #labs(color = "dams/km", size=10)+
     theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
-    theme(panel.border = element_rect(colour = "black", fill=NA))
+    theme(panel.border = element_rect(colour = "black", fill=NA))+
+   coord_sf(xlim = c(-124.5, -114), ylim = c(31.5, 42.5), expand = FALSE)
 
 ggsave("Fig_watershedboundaries.png", plot = w, width = 6.8, height = 8, units = "in", bg = "white", dpi=300)
 
@@ -140,7 +144,7 @@ ggsave("Fig_watershedboundaries.png", plot = w, width = 6.8, height = 8, units =
 palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
 
 beav <- ggplot() +
-    geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = background_crop, fill = "#dcdcdc", lwd = 0.1)+
     #geom_sf(data = WatershedBoundaries, fill = "#b0b0b0", lwd = 0.1, alpha = 0.5 ) +
     geom_sf(data = beavers, color = "black",size = .5)+
     scale_color_manual(values=palette_new)+
@@ -2628,12 +2632,12 @@ selection1 <- WatershedBoundaries %>%
 selection2 <- WatershedBoundaries %>% 
   filter(HUCID %in% c("18040012","18040013","18020126","18020129","18020125"))
 
-All <- ggplot() +
+All3 <- ggplot() +
    # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, fill = "#e8e8e8", lwd = 0.1) +
     geom_sf(data = selection, fill = "#6c83b5", lwd = .1)+
     geom_sf(data = selection1, fill = "#73ae80", lwd = .1) +
-  geom_sf(data = selection2, fill = "#2a5a5b", lwd = .1) +
+    geom_sf(data = selection2, fill = "#2a5a5b", lwd = .1) +
     theme_minimal()+
     #ggtitle(expression(paste("Potential Water Storage"))) +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
@@ -2650,7 +2654,7 @@ All <- ggplot() +
     theme(axis.text.x = element_blank(), axis.text.y = element_blank()) 
    # theme(panel.border = element_rect(colour = "black", fill=NA))
 
-ggsave("Fig_all.png", plot = All, width = 3, height = 5.3, units = "in", bg = "white", dpi=300)
+ggsave("Fig_all3.png", plot = All3, width = 3, height = 5.3, units = "in", bg = "white", dpi=300)
 ```
 
 
