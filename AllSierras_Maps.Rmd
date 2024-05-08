@@ -46,6 +46,7 @@ contFireRisk <- readRDS("contFireRisk.rds")
 #watershedsPoly <- readRDS("watershedsPoly.rds")
 #watersheds <- readRDS("watersheds.rds")
 #intermittent <- readRDS("intermittent.rds")
+landownership <- readRDS("landownership.rds")
 
 ```
 
@@ -59,6 +60,21 @@ hist(AllSierras_DamCapacity$volume)
 sum(WatershedBoundaries$area_km2_Streamshq)
 summary(WatershedBoundaries$area_km2_Streamshq)
 
+```
+##LandOwnership
+```{r}
+# Read in the shapefile with st_read()
+landownership <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/LandOwnership.shp")
+
+#remove unneeded shapefiles
+file.remove(list.files(pattern = "LandOwnership*",recursive = F))
+
+#Project to wkt (NASA projection)
+landownership <- st_transform(landownership, 3310)
+crs(AllSierras_DamCapacity) ==crs(landownership)
+
+
+saveRDS(landownership,"landownership.rds")
 ```
 ##Intermittent
 ```{r}
@@ -801,6 +817,69 @@ test$flow <- ifelse(is.na(test$flow), "perennial", test$flow)
 unique(test$flow)
 
 ```
+
+#LandOwnership
+```{r}
+
+lomap <- ggplot() +
+  geom_sf(data = landownership, aes(fill = ADMIN_UNIT)) +
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("Fire Resilience (km2)"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5))+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+
+```
+##Select private land
+```{r}
+
+#Accordig to SMA metadata, "Undetermined" Category refers to non-federal land. There are separate designations for private and state land specifically that do not show up in this dataset, so we will assume all undetermined land is private land
+#https://www.arcgis.com/sharing/rest/content/items/6bf2e737c59d4111be92420ee5ab0b46/info/metadata/metadata.xml?format=default&output=html
+
+private <- landownership[landownership$ADMIN_UNIT=="Undetermined",]
+private <- private[!is.na(private$OBJECTID), ]
+
+pirvatemap <- ggplot() +
+  geom_sf(data = private, aes(fill = ADMIN_UNIT)) +
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("Private Land"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5))+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+##add private/other column
+```{r}
+landownership$desig <- ifelse(is.na(landownership$ADMIN_UNIT), "other",
+                              ifelse(landownership$ADMIN_UNIT == "Undetermined", "private", "other"))
+
+```
+##join to watershed boundaries
+```{r}
+watersheds <- st_join(AllSierras_DamCapacity,landownership)
+
+watersheds <- st_drop_geometry(watersheds)
+
+watershedstest <- watersheds %>%
+    group_by(HUCID) %>% 
+    summarise(normVol = mean(VolumePerKm), 
+              meanDamCap = mean(oCC_EX),
+              meanHistDamCap = mean(oCC_HPE),
+              meanHistRemain = mean(mCC_EXvHPE, na.rm=T)) 
+
+WatershedBoundaries <- merge(WatershedBoundaries, watershedstest, by = "HUCID")
+watershed_csv <- st_drop_geometry(WatershedBoundaries)
+write.csv(watershed_csv, "watershed_csv.csv", row.names = TRUE)
+saveRDS(WatershedBoundaries,"WatershedBoundaries.rds")
+WatershedBoundaries <- readRDS('WatershedBoundaries.rds')
+```
+
+
 
 #Watershed-Grouped Figures
 ##Apply to watersheds
@@ -2759,4 +2838,7 @@ fire_selection2 <- ggplot() +
 
 (ndc_selection2 + fire_selection2)
 ```
+
+
+
 
