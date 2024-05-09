@@ -861,22 +861,40 @@ landownership$desig <- ifelse(is.na(landownership$ADMIN_UNIT), "other",
 ```
 ##join to watershed boundaries
 ```{r}
-watersheds <- st_join(AllSierras_DamCapacity,landownership)
+# Spatial join to overlay streams and land ownership within each watershed
+streams_land_ownership <- st_intersection(AllSierras_DamCapacity, st_difference(landownership)) %>%
+  st_join(WatershedBoundaries)
+saveRDS(streams_land_ownership, "streams_land_ownership.rds")
 
-watersheds <- st_drop_geometry(watersheds)
+# Calculate the length of the overlapped stream segments within each watershed and land ownership type
+streams_land_ownership$length <- st_length(streams_land_ownership)
 
-watershedstest <- watersheds %>%
-    group_by(HUCID) %>% 
-    summarise(normVol = mean(VolumePerKm), 
-              meanDamCap = mean(oCC_EX),
-              meanHistDamCap = mean(oCC_HPE),
-              meanHistRemain = mean(mCC_EXvHPE, na.rm=T)) 
 
-WatershedBoundaries <- merge(WatershedBoundaries, watershedstest, by = "HUCID")
-watershed_csv <- st_drop_geometry(WatershedBoundaries)
-write.csv(watershed_csv, "watershed_csv.csv", row.names = TRUE)
-saveRDS(WatershedBoundaries,"WatershedBoundaries.rds")
-WatershedBoundaries <- readRDS('WatershedBoundaries.rds')
+streams_land_ownership$proportion <- st_length(streams_land_ownership, units = "meters") / st_length(AllSierras_DamCapacity, units = "meters")
+
+# Filter the intersection based on the proportion
+majority_intersection <- streams_land_ownership[streams_land_ownership$proportion >= 0.5, ]
+
+
+unique(streams_land_ownership$Join_Count)
+# Summarize the total stream length within each watershed and land ownership type
+summary_table <- streams_land_ownership %>%
+  group_by(HUCID, desig) %>%
+  summarize(total_length = sum(length),
+            lo_water = sum(volume),
+            lo_damCt = sum(mCC_EX_CT),
+            lo_damCap = mean(oCC_EX))
+
+# Calculate the total stream length within each watershed
+watershed_totals <- streams_land_ownership %>%
+  group_by(HUCID) %>%
+  summarize(total_length = sum(length))
+
+# Calculate the percentage of stream length for each land ownership type within each watershed
+percentage_table <- summary_table %>%
+  left_join(watershed_totals, by = "watershed_id") %>%
+  mutate(percentage = (total_length / total_length.x) * 100) %>%
+  select(-total_length.x)
 ```
 
 
@@ -2406,12 +2424,13 @@ crs(highRisk_Streamshq) <- wkt
 plot(highRisk_Streamshq)
 #make sure it's the right size
 highRisk_Streamshq <- extend(highRisk_Streamshq, contFireRisk)
+
+
 #extract to watersheds
 WatershedBoundaries$npixels_Streamshq <- exact_extract(highRisk_Streamshq, WatershedBoundaries, 'count')
 WatershedBoundaries$area_m2_Streamshq <- WatershedBoundaries$npixels_Streams*270*270  
 WatershedBoundaries$area_km2_Streamshq <- round(WatershedBoundaries$area_m2_Streams/1e6,2)
 WatershedBoundaries$firerisk_normalized_Streamshq <- WatershedBoundaries$area_m2_Streamshq / WatershedBoundaries$total_area
-
 
 
 #Normalized volume / stream km
