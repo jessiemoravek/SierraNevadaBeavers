@@ -47,6 +47,9 @@ contFireRisk <- readRDS("contFireRisk.rds")
 #watersheds <- readRDS("watersheds.rds")
 #intermittent <- readRDS("intermittent.rds")
 landownership <- readRDS("landownership.rds")
+private_dams_watersheds <- readRDS("private_dams_watersheds.rds")
+private_dams <- readRDS("private_dams.rds")
+
 
 ```
 
@@ -859,8 +862,10 @@ landownership$desig <- ifelse(is.na(landownership$ADMIN_UNIT), "other",
                               ifelse(landownership$ADMIN_UNIT == "Undetermined", "private", "other"))
 
 ```
+
+
 ##join to watershed boundaries
-```{r}
+```{r eval=FALSE, include=FALSE}
 # Spatial join to overlay streams and land ownership within each watershed
 streams_land_ownership <- st_intersection(AllSierras_DamCapacity, st_difference(landownership)) %>%
   st_join(WatershedBoundaries)
@@ -896,6 +901,72 @@ percentage_table <- summary_table %>%
   mutate(percentage = (total_length / total_length.x) * 100) %>%
   select(-total_length.x)
 ```
+
+```{r}
+#private
+#WatershedBoundaries
+#AllSierras_DamCapacity
+#highRisk_Streamshq
+
+
+
+#fire
+##Fire on private land
+private_fire <- crop(highRisk_Streamshq,private)
+private_fire <- mask(private_fire,private) #fire resilience on private land
+
+##Total fire on private land across region
+total_private_fire_npixels <- exact_extract(private_fire, private, 'count') #high resil fire pixels in private land
+total_private_fire_npixels <- sum(total_private_fire_npixels)
+total_private_fire_area <- total_private_fire_npixels*270*270  
+total_private_fire_areakm2 <- round(total_private_fire_area/1e6,2)
+
+##fire on private land by watershed
+WatershedBoundaries$private_fire_watershed_npixels <- exact_extract(private_fire, WatershedBoundaries, 'count') #high resil fire pixels in private land by watershed
+WatershedBoundaries$total_private_fire_watershed_area <- WatershedBoundaries$private_fire_watershed_npixels*270*270  
+WatershedBoundaries$total_private_fire_watershed_areakm2 <- round(WatershedBoundaries$total_private_fire_watershed_area/1e6,2)
+saveRDS(WatershedBoundaries,"WatershedBoundaries.rds")
+
+
+
+#water
+private_dams <- st_intersection(private, AllSierras_DamCapacity)
+private_dams_watersheds <- st_intersection(WatershedBoundaries, private_dams)
+saveRDS(private_dams,"private_dams.rds")
+saveRDS(private_dams_watersheds,"private_dams_watersheds.rds")
+
+private_dams_watersheds_df <- st_drop_geometry(private_dams_watersheds)
+  
+lo_dams <- private_dams_watersheds_df %>% 
+  group_by(HUCID) %>%
+  summarize(lo_water = sum(volume),
+            lo_damCt = sum(mCC_EX_CT),
+            lo_damCap = mean(oCC_EX),
+            lo_normVol = mean(VolumePerKm)) 
+
+
+
+#total area
+#WatershedBoundaries$total_area <- as.numeric(st_area(WatershedBoundaries))
+private_watersheds <- st_intersection(WatershedBoundaries,private)
+
+private_watersheds$total_area_private <- as.numeric(st_area(private_watersheds))
+
+test <- private_watersheds %>% 
+  group_by(HUCID) %>% 
+  summarize(total_area_private = sum(total_area_private))
+
+test <- st_drop_geometry(test)
+merged_df <- merge(test, lo_dams, by = "HUCID", all = TRUE)
+
+
+lo_dams_csv <- st_drop_geometry(merged_df)
+write.csv(lo_dams_csv, "lo_dams_csv.csv", row.names = TRUE)
+watershedboundaries_csv <- st_drop_geometry(WatershedBoundaries)
+write.csv(watershedboundaries_csv, "watershedboundaries_csv.csv", row.names = TRUE)
+
+```
+
 
 
 
@@ -2444,7 +2515,9 @@ watershedstest <- watersheds %>%
     summarise(normVol = mean(VolumePerKm), 
               meanDamCap = mean(oCC_EX),
               meanHistDamCap = mean(oCC_HPE),
-              meanHistRemain = mean(mCC_EXvHPE, na.rm=T)) 
+              meanHistRemain = mean(mCC_EXvHPE, na.rm=T),
+              damCapCount = sum(mCC_EX_CT),
+              totalVol = sum(volume)) 
 
 WatershedBoundaries <- merge(WatershedBoundaries, watershedstest, by = "HUCID")
 watershed_csv <- st_drop_geometry(WatershedBoundaries)
