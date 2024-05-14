@@ -139,7 +139,7 @@ saveRDS(background,"background.rds")
 palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
 
 w <- ggplot() +
-    geom_sf(data = background_crop, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, fill = "#b0b0b0", lwd = 0.1, alpha = 0.5 ) +
     scale_color_manual(values=palette_new)+
     theme_minimal()+
@@ -150,8 +150,7 @@ w <- ggplot() +
     #labs(color = "dams/km", size=10)+
     theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
-    theme(panel.border = element_rect(colour = "black", fill=NA))+
-   coord_sf(xlim = c(-124.5, -114), ylim = c(31.5, 42.5), expand = FALSE)
+    theme(panel.border = element_rect(colour = "black", fill=NA))
 
 ggsave("Fig_watershedboundaries.png", plot = w, width = 6.8, height = 8, units = "in", bg = "white", dpi=300)
 
@@ -192,17 +191,19 @@ c <- ggplot() +
     scale_color_manual(values=palette_new,
                         labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
     theme_minimal()+
-    ggtitle(expression(paste("Current Dam Capacity"))) +
+    ggtitle(expression(paste("b) Current Dam Capacity"))) +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
     theme(legend.text = element_text(size=8),
           legend.title = element_text(size = 8),
           legend.position = c(.2,.20))+
     #theme(element_text(size=10),legend.position = c(.15,.2))+
-    labs(color = "dams/km", size=10)+
+     labs(color = "dams/km", size=10)+
     theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
-    theme(panel.border = element_rect(colour = "black", fill=NA))
+    theme(panel.grid.major = element_line(colour = "transparent")) +
+    theme(axis.text.x = element_blank(), axis.text.y = element_blank()) 
+   # theme(panel.border = element_rect(colour = "black", fill=NA))
 
 ggsave("Fig_damcap.png", plot = c, width = 6, height = 10.6, units = "in", bg = "white", dpi=900)
 
@@ -210,24 +211,27 @@ ggsave("Fig_damcap.png", plot = c, width = 6, height = 10.6, units = "in", bg = 
 
 ##Historical Dam Capacity Map
 ```{r}
+
 h <- ggplot() +
-    #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
-    geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(oCC_HPE, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
-    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
-    scale_color_manual(values=palette_new,
-                        labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
-    theme_minimal()+
-    ggtitle(expression(paste("Historical Dam Capacity"))) +
-    theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5)) +
-    theme(legend.text = element_text(size=8),
-          legend.title = element_text(size = 8),
-          legend.position = c(.2,.20))+
-    #theme(element_text(size=10),legend.position = c(.15,.2))+
-    labs(color = "dams/km", size=10)+
-    theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())+
-    theme(panel.border = element_rect(colour = "black", fill=NA))
+  # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1) +
+  geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity = cut(oCC_HPE, breaks = c(0, .1, 2, 5, 15, 40), include.lowest = TRUE)), aes(color = DamCapacity)) +
+  geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
+  scale_color_manual(values = palette_new, labels = c("0", "1-2", "2-5", "5-15", "15-40")) +
+  theme_minimal() +
+  ggtitle(expression(paste("a) Historical Dam Capacity"))) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 12),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.text = element_text(size = 8),
+    legend.title = element_text(size = 8),
+    legend.position = c(0.2, 0.20),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),  # Remove default panel border
+    axis.line.x = element_line(color = "black"),  # Add border to x axis
+    axis.line.y = element_line(color = "black")   # Add border to y axis
+  ) +
+  labs(color = "dams/km", size = 10)
 
 ```
 
@@ -244,16 +248,22 @@ r <- ggplot() +
     #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(mCC_EXvHPE, breaks = c(0,.25,.5,.75,1,70), include.lowest=T)),aes(color = DamCapacity)) +
     geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
-    scale_color_manual(values=palette_new)+
+    scale_color_manual(values=palette_new,
+                        labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
     theme_minimal()+
-    ggtitle(expression(paste("Percent Dam Capacity Remaining"))) +
+    ggtitle(expression(paste("c) Percent Capacity Remaining"))) +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20))+
     #theme(element_text(size=10),legend.position = c(.15,.2))+
+    labs(color = "dams/km", size=10)+
     theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
-    labs(color = "dams/km", size=10)+
-    theme(panel.border = element_rect(colour = "black", fill=NA))
+    theme(panel.grid.major = element_line(colour = "transparent")) +
+    theme(axis.text.x = element_blank(), axis.text.y = element_blank()) 
+    #theme(panel.border = element_rect(colour = "black", fill=NA))
 
 ```
 
@@ -274,15 +284,22 @@ veg <- ggplot() +
     ylab(NULL)+
     ggtitle(expression(paste("Vegetation Change"))) + 
     theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5))+
-    theme(legend.text = element_text(size=8),
-          legend.title = element_text(size = 8),
-          legend.position = c(.2,.20))+
-    theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())+
-    labs(color = "Vegetation\nChange")+
-    theme(panel.border = element_rect(colour = "black", fill=NA)) 
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 12),
+      plot.subtitle = element_text(hjust = 0.5),
+      legend.text = element_text(size = 8),
+      legend.title = element_text(size = 8),
+      legend.position = c(0.2, 0.20),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.border = element_blank(),  # Remove default panel border
+      axis.line.x = element_line(color = "black"),  # Add border to x axis
+      axis.line.y = element_line(color = "black")   # Add border to y axis
+  ) +
+  labs(color = "dams/km", size = 10)
+
+ggsave("Fig_vegchange.png", plot = veg, width = 7, height = 4.32, units = "in", bg = "white", dpi=900)
+
 ```
 
 
@@ -372,15 +389,9 @@ vol <- ggplot() +
 ```
 ###Map of watersheds + veg + volume
 ```{r}
-layout <- "
-AB
-C#
-"
+fig2 <- h+c+r
 
-r + veg + vol + 
-  plot_layout(design = layout)
-
-h+c+veg
+ggsave("Fig_damcaphist.png", plot = fig2, width = 7, height = 4.32, units = "in", bg = "white", dpi=900)
 ```
 
 
