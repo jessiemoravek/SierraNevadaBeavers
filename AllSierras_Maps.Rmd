@@ -191,8 +191,8 @@ c <- ggplot() +
     scale_color_manual(values=palette_new,
                         labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
     theme_minimal()+
-    ggtitle(expression(paste("b) Current Dam Capacity"))) +
-    theme(plot.title = element_text(hjust = 0.5, size = 12),
+    ggtitle(expression(paste("Current Dam Capacity"))) +
+    theme(plot.title = element_text(hjust = 1, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
     theme(legend.text = element_text(size=8),
           legend.title = element_text(size = 8),
@@ -218,9 +218,9 @@ h <- ggplot() +
   geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
   scale_color_manual(values = palette_new, labels = c("0", "1-2", "2-5", "5-15", "15-40")) +
   theme_minimal() +
-  ggtitle(expression(paste("a) Historical Dam Capacity"))) +
+  ggtitle(expression(paste("Historical Dam Capacity"))) +
   theme(
-    plot.title = element_text(hjust = 0.5, size = 12),
+    plot.title = element_text(hjust = 1, size = 12),
     plot.subtitle = element_text(hjust = 0.5),
     legend.text = element_text(size = 8),
     legend.title = element_text(size = 8),
@@ -251,8 +251,8 @@ r <- ggplot() +
     scale_color_manual(values=palette_new,
                         labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
     theme_minimal()+
-    ggtitle(expression(paste("c) Percent Capacity Remaining"))) +
-    theme(plot.title = element_text(hjust = 0.5, size = 12),
+    ggtitle(expression(paste("% Capacity Remaining"))) +
+    theme(plot.title = element_text(hjust = 1, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
     theme(legend.text = element_text(size=8),
           legend.title = element_text(size = 8),
@@ -375,7 +375,7 @@ vol <- ggplot() +
     ylab(NULL)+
     ggtitle(expression(paste("Change in Volume (m3)"))) + 
     theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5, size = 12),
+    theme(plot.title = element_text(hjust = 1, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
     theme(legend.text = element_text(size=8),
           legend.title = element_text(size = 8),
@@ -390,8 +390,9 @@ vol <- ggplot() +
 ###Map of watersheds + veg + volume
 ```{r}
 fig2 <- h+c+r
+fig2_abc <- fig2 + plot_annotation(tag_levels = 'A')
 
-ggsave("Fig_damcaphist.png", plot = fig2, width = 7, height = 4.32, units = "in", bg = "white", dpi=900)
+ggsave("Fig_damcaphist.png", plot = fig2_abc, width = 7, height = 4.32, units = "in", bg = "white", dpi=900)
 ```
 
 
@@ -2388,7 +2389,7 @@ ndc <- ndc %>%
 
 ```{r}
 counties <- counties(c("California", "Nevada"))
-plot(counties)
+#plot(counties)
 
 counties <- st_make_valid(counties) %>%
   dplyr::mutate(valid =st_is_valid(counties)) %>% 
@@ -2596,7 +2597,30 @@ firerisk_normalized_Streamshq_plot <- ggplot() +
 ```{r}
 (huc_ndc_plot +normVol_plot) / (firerisk_normalized_plot +firerisk_normalized_Streamshq_plot)
 ```
+c <- ggplot() +
+    #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
+    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
+    scale_color_manual(values=palette_new,
+                        labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
+    theme_minimal()+
+    ggtitle(expression(paste("Current Dam Capacity"))) +
+    theme(plot.title = element_text(hjust = 1, size = 12),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(.2,.20))+
+    #theme(element_text(size=10),legend.position = c(.15,.2))+
+     labs(color = "dams/km", size=10)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+    theme(panel.grid.major = element_line(colour = "transparent")) +
+    theme(axis.text.x = element_blank(), axis.text.y = element_blank()) 
+   # theme(panel.border = element_rect(colour = "black", fill=NA))
 
+ggsave("Fig_damcap.png", plot = c, width = 6, height = 10.6, units = "in", bg = "white", dpi=900)
+
+  
 ```{r}
 firerisk_normalized_Streamshq_plot <- ggplot() +
    # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
@@ -2604,18 +2628,18 @@ firerisk_normalized_Streamshq_plot <- ggplot() +
     scale_fill_gradient(low = "#e8e8e8", high ="#c85a5a", name = "% of High \nRisk Areas")+
     theme_minimal()+
     ggtitle(expression(paste("Potential Fire Resilience"))) +
-    theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(plot.title = element_text(hjust = 0, size = 12),
+          plot.subtitle = element_text(hjust = 0)) +
   theme(legend.text = element_text(size=7),
           legend.title = element_text(size = 7),
           legend.position = c(.2,.20),
           legend.key.size = unit(.8, "lines"),
           legend.title.align= 0.5)+
-    theme(panel.grid.major = element_blank(),
+      theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
-    #theme(element_text(size=10),legend.position = c(.15,.2))+
-    #labs(color = "dams/km", size=10)+
-    theme(panel.border = element_rect(colour = "black", fill=NA))
+    theme(panel.grid.major = element_line(colour = "transparent")) +
+    theme(axis.text.x = element_blank(), axis.text.y = element_blank()) 
+
 
 firerisk_plot <- ggplot() +
    # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
@@ -2623,8 +2647,8 @@ firerisk_plot <- ggplot() +
     scale_fill_gradient(low = "#e8e8e8", high ="#FFA500", name = "% Area\nWHP>2000")+
     theme_minimal()+
     ggtitle(expression(paste("Fire Risk"))) +
-    theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(plot.title = element_text(hjust = 0, size = 12),
+          plot.subtitle = element_text(hjust = 0)) +
    theme(legend.text = element_text(size=7),
           legend.title = element_text(size = 7),
           legend.position = c(.2,.20),
@@ -2632,9 +2656,8 @@ firerisk_plot <- ggplot() +
           legend.title.align= 0.5)+
     theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
-    #theme(element_text(size=10),legend.position = c(.15,.2))+
-    #labs(color = "dams/km", size=10)+
-    theme(panel.border = element_rect(colour = "black", fill=NA))
+    theme(panel.grid.major = element_line(colour = "transparent")) +
+    theme(axis.text.x = element_blank(), axis.text.y = element_blank()) 
 
 normVol_plot <- ggplot() +
   geom_sf(data = WatershedBoundaries) +
@@ -2644,8 +2667,8 @@ normVol_plot <- ggplot() +
   ylab(NULL)+
   ggtitle(expression(paste("Potential Water Storage"))) + 
   theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5)) + 
+  theme(plot.title = element_text(hjust = 0, size = 12),
+          plot.subtitle = element_text(hjust = 0)) + 
   theme(legend.text = element_text(size=7),
           legend.title = element_text(size = 7),
           legend.position = c(.2,.20),
@@ -2653,7 +2676,8 @@ normVol_plot <- ggplot() +
           legend.title.align= 0.5)+
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
-  theme(panel.border = element_rect(colour = "black", fill=NA))
+    theme(panel.grid.major = element_line(colour = "transparent")) +
+    theme(axis.text.x = element_blank(), axis.text.y = element_blank()) 
 
 ndcblue_plot <- ggplot() +
   geom_sf(data = WatershedBoundaries) +
@@ -2666,22 +2690,28 @@ ndcblue_plot <- ggplot() +
   ylab(NULL)+
   ggtitle(expression(paste("Water Deficit (NDC)"))) + 
   theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5)) + 
+  theme(plot.title = element_text(hjust = 0, size = 12),
+          plot.subtitle = element_text(hjust = 0)) + 
   theme(legend.text = element_text(size=7),
           legend.title = element_text(size = 7),
           legend.position = c(.2,.20),
           legend.key.size = unit(.8, "lines"),
-          legend.title.align= 0.5)+
-  theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())+
-  theme(panel.border = element_rect(colour = "black", fill=NA))
+          legend.title.align= 0.5,
+           panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.border = element_blank(),  # Remove default panel border
+          axis.line.x = element_line(color = "black"),  # Add border to x axis
+          axis.line.y = element_line(color = "black")) +   # Add border to y axis
+  labs(color = "dams/km", size = 10)
+
 ```
 
 ```{r}
- (ndcblue_plot + normVol_plot) / (firerisk_plot + firerisk_normalized_Streamshq_plot)
- ndcblue_plot + normVol_plot + firerisk_plot + firerisk_normalized_Streamshq_plot
+p <-  (ndcblue_plot + normVol_plot) / (firerisk_plot + firerisk_normalized_Streamshq_plot)
 
+p_abs <- p + plot_annotation(tag_levels = 'A')
+
+ggsave("Fig_4maps.png", plot = p_abs, width = 5.15, height = 8, units = "in", bg = "white", dpi=900)
 ```
 
 
@@ -2694,12 +2724,12 @@ y_value = 1
 
 #Vertical black line represents % high fire risk = 0.2, which is the mean
 #horizontal black line represents NDC <1, indicating watersheds with no water deficit
-ggplot()+
+s <- ggplot()+
   geom_point(data = WatershedBoundaries, aes(x = firerisk_normalized, y = (huc_ndc.x), size = normVol, color = firerisk_normalized_Streamshq))+ 
   geom_vline(xintercept = x_value, color = "black", linetype = "solid") +
   geom_hline(yintercept = y_value, color = "black", linetype = "solid") +
   #geom_text(data = WatershedBoundaries, aes(x = firerisk_normalized, y = huc_ndc, label = HUCID), vjust = -1.5, size = 2) +
-  geom_text_repel(data = WatershedBoundaries, aes(x = firerisk_normalized, y = huc_ndc.x, label = HUCID), size = 2)+
+  #geom_text_repel(data = WatershedBoundaries, aes(x = firerisk_normalized, y = huc_ndc.x, label = HUCID), size = 2)+
   theme_minimal()+
   scale_color_gradient(low = "#e8e8e8", high ="#c85a5a", name = "Potential % Area \nw/ Fire Resilience")+
   scale_y_continuous(labels = function(x) format(x, scientific = FALSE), trans = "log10")+
@@ -2863,7 +2893,7 @@ ndc_selection <- ggplot() +
           legend.key.size = unit(1, "lines")) +
     theme(legend.text = element_text(size=8),
           legend.title = element_text(size = 8),
-          legend.position = c(.2,.20),
+          legend.position = c(-.1,.20),
           legend.title.align= 0.5)+
     #labs(color = "dams/km", size=10)+
     theme(panel.grid.major = element_blank(),
@@ -2884,7 +2914,7 @@ fire_selection <- ggplot() +
           legend.key.size = unit(1, "lines")) +
     theme(legend.text = element_text(size=8),
           legend.title = element_text(size = 8),
-          legend.position = c(.2,.20),
+          legend.position = c(-.1,.20),
           legend.title.align= 0.5)+
     #labs(color = "dams/km", size=10)+
     theme(panel.grid.major = element_blank(),
@@ -2895,6 +2925,31 @@ fire_selection <- ggplot() +
 
 (ndc_selection + fire_selection)
 ```
+##Improtnat figure
+```{r}
+
+layout <- "
+AA
+AA
+B#
+"
+scatter <- s + ndc_selection + fire_selection + 
+  plot_layout(design = layout) +    plot_annotation(tag_levels = 'A')
+  
+ggsave("Fig_scatter.png", plot = scatter, width = 6.34, height = 8, units = "in", bg = "white", dpi=900)
+
+
+layout <- "
+##
+##
+#C
+"
+scatter <-  fire_selection + 
+  plot_layout(design = layout) +    plot_annotation(tag_levels = list(LETTERS[3]))
+  
+ggsave("Fig_scatterC.png", plot = scatter, width = 6.34, height = 8, units = "in", bg = "white", dpi=900)
+```
+
 ##Maybe doent do it with a selection ?
 ```{r}
 ndc_selection2 <- ggplot() +
