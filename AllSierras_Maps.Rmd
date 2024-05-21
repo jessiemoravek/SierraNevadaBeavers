@@ -142,7 +142,14 @@ w <- ggplot() +
     geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, fill = "#b0b0b0", lwd = 0.1, alpha = 0.5 ) +
     scale_color_manual(values=palette_new)+
-    theme_minimal()+
+    geom_sf_text(data = WatershedBoundaries, aes(label = HUCID)) + 
+   geom_sf_label_repel(data = WatershedBoundaries, aes(label = HUCID),  
+                      size = 3,  # Adjust text size
+                      color = "black",  # Text color
+                      label.padding = unit(0.2, "lines"),  #
+                      label.size = 0.2,  # Border size of the label box
+                      fontface = "bold",  # Font face
+                      max.overlaps = Inf) +  # 
     ggtitle(expression(paste("Watershed Boundaries"))) +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
