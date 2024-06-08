@@ -54,7 +54,39 @@ private_dams <- readRDS("private_dams.rds")
 
 ```
 
-###Dam Capacity
+#Downloading Input Files
+##WatershedBoundaries
+```{r}
+# Read in the shapefile with st_read()
+WatershedBoundaries <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/WatershedBoundaries5.shp")
+
+#remove unneeded shapefiles
+file.remove(list.files(pattern = "WatershedBoundaries*",recursive = F))
+
+#Project to 3310
+WatershedBoundaries <- st_transform(WatershedBoundaries, 3310)
+
+saveRDS(WatershedBoundaries,"WatershedBoundaries.rds")
+
+```
+
+##LandOwnership
+```{r}
+# Read in the shapefile with st_read()
+landownership <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/LandOwnership.shp")
+
+#remove unneeded shapefiles
+file.remove(list.files(pattern = "LandOwnership*",recursive = F))
+
+#Project to wkt (NASA projection)
+landownership <- st_transform(landownership, 3310)
+crs(AllSierras_DamCapacity) ==crs(landownership)
+
+
+saveRDS(landownership,"landownership.rds")
+```
+
+##Dam Capacity
 ```{r}
 # Read in the shapefile with st_read()
 AllSierras_DamCapacity <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/AllSierras_DamCapacity6.shp")
@@ -62,7 +94,7 @@ AllSierras_DamCapacity <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaB
 #remove unneeded shapefiles
 file.remove(list.files(pattern = "AllSierras_DamCapacity*",recursive = F))
 
-#Project to wkt (NASA projection)
+#Project to 3310
 AllSierras_DamCapacity <- st_transform(AllSierras_DamCapacity, 3310)
 
 saveRDS(AllSierras_DamCapacity,"AllSierras_DamCapacity.rds")
@@ -88,23 +120,22 @@ for (i in AllSierras_DamCapacity){ #for each stream segment in the BRAT model ou
 } 
 
 
-saveRDS(AllSierras_DamCapacity,"AllSierras_DamCapacity_volume.rds")
 ```
 
-#Calculate Historical Percent Remaining
+###Calculate Historical Percent Remaining
 ```{r}
 AllSierras_DamCapacity$mCC_EXvHPE <- AllSierras_DamCapacity$oCC_EX/AllSierras_DamCapacity$oCC_HPE
 #When doing this division, sometimes we get 0/0 = Inf, especially in areas that are slope limited. In one way of looking at it, these values should be converted to 1, since dam capacity stayed the same from historic to current. However we converted them to NA? 
 AllSierras_DamCapacity$mCC_EXvHPE[!is.finite(AllSierras_DamCapacity$mCC_EXvHPE)] <- NA
 ```
 
-#Change in veg suitability
+###Change in veg suitability
 ```{r}
 AllSierras_DamCapacity$VegChange100 <-  AllSierras_DamCapacity$iVeg100EX - AllSierras_DamCapacity$iVeg100Hpe 
 
 ```
 
-##Historical volume calculation
+###Historical volume calculation
 ```{r}
 for (i in AllSierras_DamCapacity){ #for each stream segment in the BRAT model output shapefile
   damCt <- AllSierras_DamCapacity$mCC_HPE_CT #number of beaver dams per segment (calculated based on dam density and segment length as the column mCC_HPE_CT in the attribute table)
@@ -124,27 +155,25 @@ for (i in AllSierras_DamCapacity){ #for each stream segment in the BRAT model ou
 
 ```
 
-##Volume Change
+###Volume Change
 ```{r}
 AllSierras_DamCapacity$VolumeChange <-  AllSierras_DamCapacity$volume - AllSierras_DamCapacity$volumeHist
 
 ```
 
-##LandOwnership
+###Normalizing volume
 ```{r}
-# Read in the shapefile with st_read()
-landownership <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/LandOwnership.shp")
+AllSierras_DamCapacity$VolumePerKm <-  AllSierras_DamCapacity$volume/((AllSierras_DamCapacity$iGeo_Len)*0.001)
 
-#remove unneeded shapefiles
-file.remove(list.files(pattern = "LandOwnership*",recursive = F))
-
-#Project to wkt (NASA projection)
-landownership <- st_transform(landownership, 3310)
-crs(AllSierras_DamCapacity) ==crs(landownership)
-
-
-saveRDS(landownership,"landownership.rds")
 ```
+
+###Save
+```{r}
+saveRDS(AllSierras_DamCapacity,"AllSierras_DamCapacity_volume.rds")
+
+```
+
+
 
 
 #Summary Stats
@@ -158,8 +187,8 @@ sum(AllSierras_DamCapacity$mCC_EX_CT)
 sum(AllSierras_DamCapacity$mCC_HPE_CT)
 ```
 
-##Watershed Boundaries Map
-
+#Descriptive Figures
+##Figure 2 Inset
 ```{r}
 palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
 
@@ -187,9 +216,33 @@ w <- ggplot() +
 ggsave("Fig_watershedboundaries.png", plot = w, width = 6.8, height = 8, units = "in", bg = "white", dpi=300)
 
 ```
+##Figure 2a: Historical Dam Capacity Map
+```{r}
 
+h <- ggplot() +
+  # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1) +
+  geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity = cut(oCC_HPE, breaks = c(0, .1, 2, 5, 15, 40), include.lowest = TRUE)), aes(color = DamCapacity)) +
+  geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
+  scale_color_manual(values = palette_new, labels = c("0", "1-2", "2-5", "5-15", "15-40")) +
+  theme_minimal() +
+  ggtitle(expression(paste("Historical Dam Capacity"))) +
+  theme(
+    plot.title = element_text(hjust = 1, size = 12),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.text = element_text(size = 8),
+    legend.title = element_text(size = 8),
+    legend.position = c(0.2, 0.20),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),  # Remove default panel border
+    axis.line.x = element_line(color = "black"),  # Add border to x axis
+    axis.line.y = element_line(color = "black")   # Add border to y axis
+  ) +
+  labs(color = "dams/km", size = 10)
 
-##Current Dam Capacity Map
+```
+
+##Figure 2b: Current Dam Capacity Map
 ```{r}
 #scales::show_col(palette_new)
 
@@ -216,35 +269,7 @@ c <- ggplot() +
 
 ```
 
-##Historical Dam Capacity Map
-```{r}
-
-h <- ggplot() +
-  # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1) +
-  geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity = cut(oCC_HPE, breaks = c(0, .1, 2, 5, 15, 40), include.lowest = TRUE)), aes(color = DamCapacity)) +
-  geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
-  scale_color_manual(values = palette_new, labels = c("0", "1-2", "2-5", "5-15", "15-40")) +
-  theme_minimal() +
-  ggtitle(expression(paste("Historical Dam Capacity"))) +
-  theme(
-    plot.title = element_text(hjust = 1, size = 12),
-    plot.subtitle = element_text(hjust = 0.5),
-    legend.text = element_text(size = 8),
-    legend.title = element_text(size = 8),
-    legend.position = c(0.2, 0.20),
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    panel.border = element_blank(),  # Remove default panel border
-    axis.line.x = element_line(color = "black"),  # Add border to x axis
-    axis.line.y = element_line(color = "black")   # Add border to y axis
-  ) +
-  labs(color = "dams/km", size = 10)
-
-```
-
-
-
-##Percent Remaining Map
+##Fibure 2c: Percent Remaining Map
 ```{r}
 r <- ggplot() +
     #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
@@ -269,9 +294,16 @@ r <- ggplot() +
 
 ```
 
+##Figure 2 Layout
+```{r}
+fig2 <- h+c+r
+fig2_abc <- fig2 + plot_annotation(tag_levels = 'A')
 
+ggsave("Fig_damcaphist.png", plot = fig2_abc, width = 7, height = 4.32, units = "in", bg = "white", dpi=900)
+##Inset added in photoshop
+```
 
-##Change in veg suitability map
+#Supplement Figure S1: Change in veg suitability map
 ```{r}
 
 veg <- ggplot() +
@@ -300,94 +332,8 @@ ggsave("Fig_vegchange.png", plot = veg, width = 7, height = 4.32, units = "in", 
 
 ```
 
-
-
-#Change in volume
-##Historical volume map
-```{r}
-hmap <- ggplot() +
-    geom_sf(data = AllSierras_DamCapacity, aes(color = volumeHist)) +
-    scale_color_viridis(discrete = FALSE, option = "plasma", na.value = "grey70")+
-    xlab(NULL)+
-    ylab(NULL)+
-    ggtitle(expression(paste("Potential Water Storage (m3)"))) + 
-    theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5),
-          plot.subtitle = element_text(hjust = 0.5)) +
-    theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())+
-    theme(panel.border = element_rect(colour = "black", fill=NA))
-```
-
-##Current volume map
-```{r}
-currentVol <- ggplot() +
-    geom_sf(data = AllSierras_DamCapacity, aes(color = volume)) +
-    scale_color_viridis(discrete = FALSE, option = "plasma", na.value = "grey70")+
-    xlab(NULL)+
-    ylab(NULL)+
-    ggtitle(expression(paste("Potential Water Storage (m3)"))) + 
-    theme_minimal() +
-    theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())+
-    theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5)) 
-```
-
-##Volume change map
-```{r}
-vol <- ggplot() +
-    geom_sf(data = AllSierras_DamCapacity, aes(color = VolumeChange)) +
-    scale_color_gradient2(low = "red", mid = "grey70", high = "blue", midpoint = 0, na.value = "grey70")+
-    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
-    xlab(NULL)+
-    ylab(NULL)+
-    ggtitle(expression(paste("Change in Volume (m3)"))) + 
-    theme_minimal() +
-    theme(plot.title = element_text(hjust = 1, size = 12),
-          plot.subtitle = element_text(hjust = 0.5)) +
-    theme(legend.text = element_text(size=8),
-          legend.title = element_text(size = 8),
-          legend.position = c(.2,.20))+
-    theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())+
-    labs(color = "Volume\nChange (m3)")+
-    theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())+
-    theme(panel.border = element_rect(colour = "black", fill=NA))
-```
-
-###Figure 2 Map
-```{r}
-fig2 <- h+c+r
-fig2_abc <- fig2 + plot_annotation(tag_levels = 'A')
-
-ggsave("Fig_damcaphist.png", plot = fig2_abc, width = 7, height = 4.32, units = "in", bg = "white", dpi=900)
-```
-
-
-##Normalizing volume
-```{r}
-AllSierras_DamCapacity$VolumePerKm <-  AllSierras_DamCapacity$volume/((AllSierras_DamCapacity$iGeo_Len)*0.001)
-
-```
-##Current volumePerKm map
-```{r}
-volperkm <- ggplot() +
-    geom_sf(data = AllSierras_DamCapacity, aes(color = VolumePerKm)) +
-    scale_color_viridis(discrete = FALSE, option = "plasma", na.value = "grey70")+
-    xlab(NULL)+
-    ylab(NULL)+
-    ggtitle(expression(paste("Potential Water Storage (m3/km)"))) + 
-    theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5))+
-    theme(panel.border = element_rect(colour = "black", fill=NA)) 
-```
-
-
-
-#Fire Risk Continuous
+#Fire Risk 
+#Fire Risk Continuous WHP data layer
 ```{r}
 #Read in the raster 
 contFireRisk <- rast("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/FireRisk/FireRisk_4.tif")
@@ -407,7 +353,7 @@ contFireRisk <- readRDS("contFireRisk.rds")
 ```
 
 
-##Fire risk vs. dam capacity
+##Extract fire risk to places with dams (stream network)
 ```{r}
 contFireRisk$Band_1
 contFireRisk_df <- as_data_frame(contFireRisk, xy=T)
@@ -438,7 +384,7 @@ summary(contFireRisk$Band_1)
 
 highRisk <- contFireRisk
 highRisk[highRisk[] < 2000] = NA 
-plot(highRisk, zlim = c(0,70), main = "Filtered raster")
+#plot(highRisk, zlim = c(0,70), main = "Filtered raster")
 
 ```
 
@@ -467,17 +413,18 @@ result <- as.data.frame(riskExtract) %>%
   summarise(pixels = n()) %>% 
   mutate(`area m^2` = pixels * 270 * 270, #multiply by pixel area
          `area km^2` = round(`area m^2`/1e6,2)) 
-#1365 km2 of fire resilience conferred 
 ```
 
-#Intermittent
+#Intermittent Streams
 ##Assign Perennial
 ```{r}
+#Intermittent assigned in pre-processing
+
 AllSierras_DamCapacity$Flow <- ifelse(is.na(AllSierras_DamCapacity$Flow), "perennial", AllSierras_DamCapacity$Flow)
 
 ```
 
-##percentages
+##Supplementary Table S2: Calculate Percentages of intermittency
 ```{r}
 #% of total stream km
 intermittent <- AllSierras_DamCapacity %>% 
@@ -542,7 +489,7 @@ pct_fifteen_forty_intermittent_len <- fifteen_forty_intermittent_len/total_lengt
 
 ```
 
-##Current Intermittent Dam Capacity Map
+##Supplementary Figure S2: Intermittent Dam Capacity Map
 ```{r}
 #scales::show_col(palette_new)
 
@@ -566,7 +513,7 @@ ci <- ggplot() +
     theme(panel.border = element_rect(colour = "black", fill=NA))
 
 ```
-##percent intermittent water storage
+##Supplementary Table S2: Total percent intermittent water storage
 ```{r}
 intermittent_water <- sum(intermittent$volume) #m
 total_water <- sum(AllSierras_DamCapacity$volume)
@@ -617,353 +564,8 @@ pct_fire_intermittent <- intermittent_fire/total_fire
 
 ```
 
-##Historical Intermittent Dam Capacity Map
-```{r}
-h <- ggplot() +
-    #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
-    geom_sf(data = transform(intermittent, DamCapacity=cut(oCC_HPE, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
-    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
-    scale_color_manual(values=palette_new,
-                        labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
-    theme_minimal()+
-    ggtitle(expression(paste("Historical Dam Capacity"))) +
-    theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5)) +
-    theme(legend.text = element_text(size=8),
-          legend.title = element_text(size = 8),
-          legend.position = c(.2,.20))+
-    #theme(element_text(size=10),legend.position = c(.15,.2))+
-    labs(color = "dams/km", size=10)+
-    theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())+
-    theme(panel.border = element_rect(colour = "black", fill=NA))
-
-```
-
-##combine intermittent with perennial network
-```{r eval=FALSE, include=FALSE}
-intermittent$flow <- "intermittent"
-sum(intermittent$flow == "intermittent")
-intermittent_selection <- intermittent[,c("geometry","flow")]
-
-test <- st_join(AllSierras_DamCapacity, intermittent_selection, join= st_overlaps)
-unique(test$flow)
-sum(test$flow =="intermittent", na.rm=T)
-
-
-test2 <- dplyr::distinct(test)
-
-unique(st_is_valid(AllSierras_DamCapacity))
-unique(st_is_valid(test2))
-
-
-
-test$flow <- ifelse(is.na(test$flow), "perennial", test$flow)
-unique(test$flow)
-
-```
-
-#LandOwnership
-```{r}
-
-lomap <- ggplot() +
-  geom_sf(data = landownership, aes(fill = ADMIN_UNIT)) +
-  xlab(NULL)+
-  ylab(NULL)+
-  ggtitle(expression(paste("Fire Resilience (km2)"))) + 
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5))+
-  theme(panel.border = element_rect(colour = "black", fill=NA))
-
-
-```
-##Select private land
-```{r}
-
-#Accordig to SMA metadata, "Undetermined" Category refers to non-federal land. There are separate designations for private and state land specifically that do not show up in this dataset, so we will assume all undetermined land is private land
-#https://www.arcgis.com/sharing/rest/content/items/6bf2e737c59d4111be92420ee5ab0b46/info/metadata/metadata.xml?format=default&output=html
-
-private <- landownership[landownership$ADMIN_UNIT=="Undetermined",]
-private <- private[!is.na(private$OBJECTID), ]
-
-pirvatemap <- ggplot() +
-  geom_sf(data = private, aes(fill = ADMIN_UNIT)) +
-  xlab(NULL)+
-  ylab(NULL)+
-  ggtitle(expression(paste("Private Land"))) + 
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5))+
-  theme(panel.border = element_rect(colour = "black", fill=NA))
-
-```
-##add private/other column
-```{r}
-landownership$desig <- ifelse(is.na(landownership$ADMIN_UNIT), "other",
-                              ifelse(landownership$ADMIN_UNIT == "Undetermined", "private", "other"))
-
-```
-
-
-##join to watershed boundaries
-```{r eval=FALSE, include=FALSE}
-# Spatial join to overlay streams and land ownership within each watershed
-streams_land_ownership <- st_intersection(AllSierras_DamCapacity, st_difference(landownership)) %>%
-  st_join(WatershedBoundaries)
-saveRDS(streams_land_ownership, "streams_land_ownership.rds")
-
-# Calculate the length of the overlapped stream segments within each watershed and land ownership type
-streams_land_ownership$length <- st_length(streams_land_ownership)
-
-
-streams_land_ownership$proportion <- st_length(streams_land_ownership, units = "meters") / st_length(AllSierras_DamCapacity, units = "meters")
-
-# Filter the intersection based on the proportion
-majority_intersection <- streams_land_ownership[streams_land_ownership$proportion >= 0.5, ]
-
-
-unique(streams_land_ownership$Join_Count)
-# Summarize the total stream length within each watershed and land ownership type
-summary_table <- streams_land_ownership %>%
-  group_by(HUCID, desig) %>%
-  summarize(total_length = sum(length),
-            lo_water = sum(volume),
-            lo_damCt = sum(mCC_EX_CT),
-            lo_damCap = mean(oCC_EX))
-
-# Calculate the total stream length within each watershed
-watershed_totals <- streams_land_ownership %>%
-  group_by(HUCID) %>%
-  summarize(total_length = sum(length))
-
-# Calculate the percentage of stream length for each land ownership type within each watershed
-percentage_table <- summary_table %>%
-  left_join(watershed_totals, by = "watershed_id") %>%
-  mutate(percentage = (total_length / total_length.x) * 100) %>%
-  select(-total_length.x)
-```
-
-```{r}
-#private
-#WatershedBoundaries
-#AllSierras_DamCapacity
-#highRisk_Streamshq
-
-
-
-#fire
-##Fire on private land
-private_fire <- crop(highRisk_Streamshq,private)
-private_fire <- mask(private_fire,private) #fire resilience on private land
-
-##Total fire on private land across region
-total_private_fire_npixels <- exact_extract(private_fire, private, 'count') #high resil fire pixels in private land
-total_private_fire_npixels <- sum(total_private_fire_npixels)
-total_private_fire_area <- total_private_fire_npixels*270*270  
-total_private_fire_areakm2 <- round(total_private_fire_area/1e6,2)
-
-##fire on private land by watershed
-WatershedBoundaries$private_fire_watershed_npixels <- exact_extract(private_fire, WatershedBoundaries, 'count') #high resil fire pixels in private land by watershed
-WatershedBoundaries$total_private_fire_watershed_area <- WatershedBoundaries$private_fire_watershed_npixels*270*270  
-WatershedBoundaries$total_private_fire_watershed_areakm2 <- round(WatershedBoundaries$total_private_fire_watershed_area/1e6,2)
-saveRDS(WatershedBoundaries,"WatershedBoundaries.rds")
-
-
-
-#water
-private_dams <- st_intersection(private, AllSierras_DamCapacity)
-private_dams_watersheds <- st_intersection(WatershedBoundaries, private_dams)
-saveRDS(private_dams,"private_dams.rds")
-saveRDS(private_dams_watersheds,"private_dams_watersheds.rds")
-
-private_dams_watersheds_df <- st_drop_geometry(private_dams_watersheds)
-  
-lo_dams <- private_dams_watersheds_df %>% 
-  group_by(HUCID) %>%
-  summarize(lo_water = sum(volume),
-            lo_damCt = sum(mCC_EX_CT),
-            lo_damCap = mean(oCC_EX),
-            lo_normVol = mean(VolumePerKm)) 
-
-
-
-#total area
-#WatershedBoundaries$total_area <- as.numeric(st_area(WatershedBoundaries))
-private_watersheds <- st_intersection(WatershedBoundaries,private)
-
-private_watersheds$total_area_private <- as.numeric(st_area(private_watersheds))
-
-test <- private_watersheds %>% 
-  group_by(HUCID) %>% 
-  summarize(total_area_private = sum(total_area_private))
-
-test <- st_drop_geometry(test)
-merged_df <- merge(test, lo_dams, by = "HUCID", all = TRUE)
-
-
-lo_dams_csv <- st_drop_geometry(merged_df)
-write.csv(lo_dams_csv, "lo_dams_csv.csv", row.names = TRUE)
-watershedboundaries_csv <- st_drop_geometry(WatershedBoundaries)
-write.csv(watershedboundaries_csv, "watershedboundaries_csv.csv", row.names = TRUE)
-
-```
-
-
-
-
-#Watershed-Grouped Figures
-##Apply to watersheds
-```{r}
-#fireRisk_normalized = area of high fire risk pixels / total pixels 
-WatershedBoundaries$npixels <- exact_extract(riskExtract, WatershedBoundaries, 'count')
-WatershedBoundaries$area_m2 <- WatershedBoundaries$npixels*270*270  
-WatershedBoundaries$area_km2 <- round(WatershedBoundaries$area_m2/1e6,2)
-WatershedBoundaries$total_area <- as.numeric(st_area(WatershedBoundaries))
-WatershedBoundaries$total_area_km2 <- round(WatershedBoundaries$total_area/1e6,2)
-WatershedBoundaries$firerisk_normalized <- WatershedBoundaries$area_m2 / WatershedBoundaries$total_area
-
-
-
-#firerisk_normalized_Streamshq = area of fire resilient pixels / pixels along streams 
-#High fire risk pixels along streams
-riskExtract_Streams <- extract(riskExtract, AllSierras_DamCapacity, xy = TRUE, touches = TRUE, na.rm=T)
-riskExtract_Streams <- riskExtract_Streams[,c(3,4,2)] #reorder for Rast function
-riskExtract_Streams <- riskExtract_Streams[complete.cases(riskExtract_Streams), ]
-riskExtract_Streams <- rast(riskExtract_Streams, type = 'xyz')
-wkt <- crs(contFireRisk)
-crs(riskExtract_Streams) <- wkt
-plot(riskExtract_Streams)
-#make sure it's the right size
-riskExtract_Streams <- extend(riskExtract_Streams, contFireRisk)
-#extract to watersheds
-WatershedBoundaries$npixels_Streams <- exact_extract(riskExtract_Streams, WatershedBoundaries, 'count')
-WatershedBoundaries$area_m2_Streams <- WatershedBoundaries$npixels_Streams*270*270  
-WatershedBoundaries$area_km2_Streams <- round(WatershedBoundaries$area_m2_Streams/1e6,2)
-
-
-#High fire risk pixels along high quality streams
-riskExtract_Streamshq <- extract(riskExtract, highquality, xy = TRUE, touches = TRUE)
-riskExtract_Streamshq <- riskExtract_Streamshq[,c(3,4,2)] #reorder for Rast function
-riskExtract_Streamshq <- riskExtract_Streamshq[complete.cases(riskExtract_Streamshq), ]
-riskExtract_Streamshq <- rast(riskExtract_Streamshq, type = 'xyz')
-wkt <- crs(contFireRisk)
-crs(riskExtract_Streamshq) <- wkt
-plot(riskExtract_Streamshq)
-#make sure it's the right size
-riskExtract_Streamshq <- extend(riskExtract_Streamshq, contFireRisk)
-#extract to watersheds
-WatershedBoundaries$npixels_Streamshq <- exact_extract(riskExtract_Streamshq, WatershedBoundaries, 'count')
-WatershedBoundaries$area_m2_Streamshq <- WatershedBoundaries$npixels_Streams*270*270  
-WatershedBoundaries$area_km2_Streamshq <- round(WatershedBoundaries$area_m2_Streams/1e6,2)
-WatershedBoundaries$firerisk_normalized_Streamshq <- WatershedBoundaries$area_m2_Streamshq / WatershedBoundaries$total_area
-
-
-
-#Normalized volume / stream km
-AllSierras_DamCapacity$VolumePerKm <-  AllSierras_DamCapacity$volume/((AllSierras_DamCapacity$iGeo_Len)*0.001)
-watersheds <- st_join(WatershedBoundaries,AllSierras_DamCapacity)
-
-watersheds <- watersheds %>%
-    group_by(geometry) %>% 
-    summarise(normVol = mean(VolumePerKm))
-
-WatershedBoundaries <- st_join(WatershedBoundaries, watersheds, by = "geometry")
-```
-
-```{r}
-frw <- ggplot() +
-  geom_sf(data = WatershedBoundaries, aes(fill = area_km2)) +
-  scale_fill_viridis_c(option = 'inferno') + 
-  xlab(NULL)+
-  ylab(NULL)+
-  ggtitle(expression(paste("Fire Resilience (km2)"))) + 
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5))+
-  theme(panel.border = element_rect(colour = "black", fill=NA))
-```
-
-```{r}
-frw_n <- ggplot() +
-  geom_sf(data = WatershedBoundaries, aes(fill = firerisk_normalized)) +
-  scale_fill_viridis_c(option = 'inferno') + 
-  xlab(NULL)+
-  ylab(NULL)+
-  ggtitle(expression(paste("Normalized Fire Resilience \n(% total area)"))) + 
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5))+
-  theme(panel.border = element_rect(colour = "black", fill=NA))
-```
-
-
-
-##Watershed-grouped table
-```{r}
-test <- watersheds %>%
-    group_by(geometry) %>% 
-    summarise(normVol = mean(VolumePerKm),
-              totalVol = sum(volume),
-              totalVolHist = sum(volumeHist),
-              totalVolChange = sum(VolumeChange),
-              totalBeavs = sum(mCC_EX_CT),
-              avgBeavs = mean(oCC_EX),
-              histBeavs = mean(oCC_HPE),
-              histChange = mean(mCC_EXvHPE, na.rm=T))
-
-test$npixels <- exact_extract(riskExtract, test, 'count')
-test$area_m2 <- test$npixels*270*270  
-test$area_km2 <- round(test$area_m2/1e6,2)
-?rename
-test_df <-as_data_frame(test, xy = T)
-
-table1 <- test_df %>%
-  dplyr::select(geometry, histBeavs, avgBeavs, histChange, totalVol, area_km2) %>%  
-  dplyr:: rename(`Historical mean dam capacity (dams/km)` = histBeavs, 
-                 `Current mean dam capacity (dams/km)` = avgBeavs, 
-                 `Percent dam capacity remaining (%)` = histChange, 
-                 `Total potential water storage (m3)` = totalVol, 
-                 `Total area of potential fire resilience in high-risk fire areas (km2)` = area_km2)
-
-st_as_sf(table1)
-#st_write(table1, "table1.shp")
-```
-
-
 
 #Bivariate Colorpleth Map
-######Put potential water storage into raster
-```{r}
-#convert to spatVector object
-sv_AllSierras <- terra::vect(AllSierras_DamCapacity)
-
-#Create empty raster called "er"
-er <- rast(ext(contFireRisk), resolution=res(contFireRisk)) 
-crs(er) <- crs(contFireRisk)
-
-#Use rasterize function in terra to put volume column into a raster
-nr <- terra::rasterize(sv_AllSierras, er, field= "volume", fun = "sum", touches = TRUE, update = TRUE)
-plot(nr)
-
-volumeR <- nr
-saveRDS(volumeR, "volumeR.rds")
-
-#Make sure fire risk (riskExtract) is on same raster scale as volume
-fireResilience <- extend(riskExtract, contFireRisk)
-fireResilienceSome <- extend(fireExtract, contFireRisk)
-
-
-#Save as .tif files
-writeRaster(fireResilienceSome, "fireResilienceSome.tif", overwrite=T)
-
-writeRaster(fireResilience, "fireResilience.tif", overwrite=T)
-writeRaster(volumeR, "waterStorage.tif", overwrite=T)
-```
-
-
-
-
 ##Function producing color matrix (from Chapman et al. 2023)
 ```{r}
 # The function that produces the colour matrix
@@ -1139,12 +741,33 @@ bivariate.map <- function(rasterx, rastery, colourmatrix = col.matrix,
 ```
 
 
-
-#Try again with fire extracted to beavers and stream network
-
-##extract data
+##Put potential water storage into a raster
 ```{r}
-#Extract fire layer to just hq streams
+#convert to spatVector object
+sv_AllSierras <- terra::vect(AllSierras_DamCapacity)
+
+#Create empty raster called "er"
+er <- rast(ext(contFireRisk), resolution=res(contFireRisk)) 
+crs(er) <- crs(contFireRisk)
+
+#Use rasterize function in terra to put volume column into a raster
+nr <- terra::rasterize(sv_AllSierras, er, field= "volume", fun = "sum", touches = TRUE, update = TRUE)
+plot(nr)
+
+volumeR <- nr
+saveRDS(volumeR, "volumeR.rds")
+
+#Make sure fire risk (riskExtract) is on same raster scale as volume
+fireResilience <- extend(riskExtract, contFireRisk)
+
+writeRaster(fireResilience, "fireResilience.tif", overwrite=T)
+writeRaster(volumeR, "waterStorage.tif", overwrite=T)
+```
+
+
+##extract data to streams network and beaver presence
+```{r}
+#Extract fire layer to just high quality (hq) streams
 highRisk_Streamshq <- extract(highRisk, highquality, xy = TRUE, touches = TRUE)
 highRisk_Streamshq <- highRisk_Streamshq[,c(3,4,2)] #reorder for Rast function
 highRisk_Streamshq <- rast(highRisk_Streamshq, type = 'xyz')
@@ -1156,7 +779,6 @@ highRiskHighQualtest <- highRisk_Streamshq
 waterStorage <- rast("waterStorage.tif")
 highRiskHighQualtest <- extend(highRiskHighQualtest, waterStorage)
 
-plot(highRiskHighQual)
 plot(waterStorage)
 
 #save as raster
@@ -1176,7 +798,7 @@ r4 <- c(highRiskHighQual, waterStorage)
 names(r4) <- c("highRiskHighQual","waterStorage")
 ```
 
-##YAY try with 4 colors
+##Create bivariate cloropleth map with 4 colors
 ```{r cache=TRUE}
 # Define the number of breaks
 nBreaks <- 2
@@ -1213,7 +835,7 @@ plot(bivmapQ4)
 # Make the map using ggplot
 
 
-
+#Map
 map_q5 <- ggplot() +
     geom_tile(data = bivMapDFQ4, aes(x = x, y = y, fill = bivVal)) +
       scale_fill_gradientn(colours = col.matrixQ4, na.value = "transparent") + 
@@ -1232,7 +854,7 @@ map_q5 <- ggplot() +
 
 map_q5 <- map_q5 + inset_element(BivLegend, 0, 0, 0.3, 0.2)
 ```
-##post processing 4 colors
+##post processing; assign 4 colors
 ```{r}
 colMatrix_rasValueshighRiskHighQual %>%
   distinct(rasValue, HEX)
@@ -1289,24 +911,10 @@ hist(data_long4_summary$percentage)
 data_long4_summary <- data_long4_summary[order(data_long4_summary$percentage, decreasing = TRUE),]
 ```
 
-
+##Figure 5b: Barplot
 ```{r}
 
 bold_labels <-c("18040011","18020125","18040012", "18020126", "18020128","18020129", "18040013")
-
-colorado <- function(src, boulder) {
-  if (!is.factor(src)) src <- factor(src)                   # make sure it's a factor
-  src_levels <- levels(src)                                 # retrieve the levels in their order
-  brave <- boulder %in% src_levels                          # make sure everything we want to make bold is actually in the factor levels
-  if (all(brave)) {                                         # if so
-    b_pos <- purrr::map_int(boulder, ~which(.==src_levels)) # then find out where they are
-    b_vec <- rep("plain", length(src_levels))               # make'm all plain first
-    b_vec[b_pos] <- "bold"                                  # make our targets bold
-    b_vec                                                   # return the new vector
-  } else {
-    stop("All elements of 'boulder' must be in src")
-  }
-}
 
 # Plot
 map_b4 <- ggplot(data_long4, aes(x = HUCID_num, y = percentage, fill = variable)) +
@@ -1322,15 +930,16 @@ map_b4 <- ggplot(data_long4, aes(x = HUCID_num, y = percentage, fill = variable)
        y = "Percentage") +
   theme_minimal()+
   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
-  theme(axis.text.x=element_text(face=colorado(data_long4$HUCID_num, c("18040011","18020125","18040012", "18020126", "18020128","18020129", "18040013", '18010122'))))+
+  #theme(axis.text.x=element_text(face=colorado(data_long4$HUCID_num, c("18040011","18020125","18040012", "18020126", "18020128","18020129", "18040013", '18010122'))))+
   theme(panel.grid = element_blank())+
+  theme(axis.text.x = element_text(face = c('plain', 'plain','plain','plain','plain','bold','plain','plain','bold','bold','bold','bold','plain','plain','plain','plain','plain','plain','plain','plain','plain','plain','plain','plain','plain','bold','bold','bold','plain','plain','plain')))+
   theme(legend.position = "none")
 
 ggsave("barplot4.png", plot = map_b4, width = 4, height = 4.5, units = "in", dpi=300)
 
 
 ```
-##Figure
+##Figure 5a: Bivariate Cloropleth map
 ```{r}
 selection1 <- WatershedBoundaries %>% 
   filter(HUCID %in% c("18040011","18020125","18040012", "18020126", "18020128","18020129", "18040013", '18010122'))
@@ -1343,7 +952,7 @@ map_q6 <- ggplot() +
     geom_sf(data = selection1, fill = NA, lwd = .55) +
     theme_classic() + theme(panel.grid.major = element_blank(),
                             panel.grid.minor = element_blank()) +
-    theme(text = element_text(size = 18, colour = "black")) +
+    theme(text = element_text(size = 12, colour = "black")) +
     borders(colour = "black", size = 0.1) +
     coord_sf() +
     theme(legend.position = "none",
@@ -1359,6 +968,7 @@ ggsave("map_q6.png", plot = map_q6, width = 7.6, height = 4.69, units = "in", dp
 ```
 
 
+##Figure 5 Layout
 ```{r}
 library(Cairo)
 png(filename = "map_q6png.png", width = 7.6, height = 4.69, units = "in", type = "cairo", res = 800) 
@@ -1369,16 +979,15 @@ while (!is.null(dev.list()))  dev.off()
 
 
 
-#NDC
-##read in CSV
-
-
+#Water deficit (NDC)
+##read in CSV of NDC by county
 ```{r}
 ndc <- read.csv("final_results_dissemination_NDINDC.csv")
 ndc <- ndc %>% 
   filter(State == "California" | State == "Nevada")
 ```
 
+##Clean up data
 ```{r}
 counties <- counties(c("California", "Nevada"))
 #plot(counties)
@@ -1396,24 +1005,7 @@ counties$State <- ifelse(counties$STATEFP == "06", "California", "Nevada")
 ndc_cty <- left_join(counties, ndc, by = c("County","State"))
 ```
 
-```{r}
-summary(ndc_cty$NDC)
-ndcplot <- ggplot() +
-   # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
-    geom_sf(data = ndc_cty, aes(fill = NDC), lwd = 0.1) +
-     scale_fill_gradient(limits = c(0, 30),
-                      oob = scales::squish,
-                      labels = c("0", "10", "20", "30+"))+
-    theme_minimal()+
-    ggtitle(expression(paste("NDC by County"))) +
-    theme(plot.title = element_text(hjust = 0.5, size = 12),
-          plot.subtitle = element_text(hjust = 0.5)) +
-    #theme(element_text(size=10),legend.position = c(.15,.2))+
-    #labs(color = "dams/km", size=10)+
-    theme(panel.border = element_rect(colour = "black", fill=NA))
-
-```
-
+##Intersect with watersheds
 ```{r}
 # Create a fresh area variable for watersheds
 WatershedBoundaries <- mutate(WatershedBoundaries, watershed_area = st_area(WatershedBoundaries))
@@ -1435,6 +1027,8 @@ intersect_ndc <- st_intersection(WatershedBoundaries,ndc_cty) %>%
 WatershedBoundaries <- left_join(WatershedBoundaries, intersect_ndc, by = "HUCID")
 
 ```
+
+##Double check results 
 ```{r}
 summary(WatershedBoundaries$huc_ndc)
 
@@ -1531,35 +1125,7 @@ WatershedBoundaries <- readRDS('WatershedBoundaries.rds')
 ```
 
 
-
-
-```{r}
-(huc_ndc_plot +normVol_plot) / (firerisk_normalized_plot +firerisk_normalized_Streamshq_plot)
-```
-c <- ggplot() +
-    #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
-    geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
-    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
-    scale_color_manual(values=palette_new,
-                        labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
-    theme_minimal()+
-    ggtitle(expression(paste("Current Dam Capacity"))) +
-    theme(plot.title = element_text(hjust = 1, size = 12),
-          plot.subtitle = element_text(hjust = 0.5)) +
-    theme(legend.text = element_text(size=8),
-          legend.title = element_text(size = 8),
-          legend.position = c(.2,.20))+
-    #theme(element_text(size=10),legend.position = c(.15,.2))+
-     labs(color = "dams/km", size=10)+
-    theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())+
-    theme(panel.grid.major = element_line(colour = "transparent")) +
-    theme(axis.text.x = element_blank(), axis.text.y = element_blank()) 
-   # theme(panel.border = element_rect(colour = "black", fill=NA))
-
-ggsave("Fig_damcap.png", plot = c, width = 6, height = 10.6, units = "in", bg = "white", dpi=900)
-
-  
+##Figure 3
 ```{r}
 firerisk_normalized_Streamshq_plot <- ggplot() +
    # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
@@ -1620,7 +1186,7 @@ normVol_plot <- ggplot() +
 
 ndcblue_plot <- ggplot() +
   geom_sf(data = WatershedBoundaries) +
-  geom_sf(data = WatershedBoundaries, aes(fill = huc_ndc.x), inherit.aes = FALSE) +
+  geom_sf(data = WatershedBoundaries, aes(fill = huc_ndc), inherit.aes = FALSE) +
   scale_fill_gradient(low = "#e8e8e8", high = "#73ae80", name = "NDC", 
                       limits = c(0, 30),
                       oob = scales::squish,
@@ -1645,6 +1211,7 @@ ndcblue_plot <- ggplot() +
 
 ```
 
+##Figure 3 Layout
 ```{r}
 p <-  (ndcblue_plot + normVol_plot) / (firerisk_plot + firerisk_normalized_Streamshq_plot)
 
@@ -1654,7 +1221,7 @@ ggsave("Fig_4maps.png", plot = p_abs, width = 5.15, height = 8, units = "in", bg
 ```
 
 
-##Make a scatterplot
+##Figure 4a
 ```{r}
 summary(WatershedBoundaries$firerisk_normalized)
 #mean = 0.2
@@ -1663,12 +1230,12 @@ y_value = 1
 
 #Vertical black line represents % high fire risk = 0.2, which is the mean
 #horizontal black line represents NDC <1, indicating watersheds with no water deficit
-s <- ggplot()+
-  geom_point(data = WatershedBoundaries, aes(x = firerisk_normalized, y = (huc_ndc.x), size = normVol, color = firerisk_normalized_Streamshq))+ 
+st <- ggplot()+
+  geom_point(data = WatershedBoundaries, aes(x = firerisk_normalized, y = (huc_ndc), size = normVol, color = firerisk_normalized_Streamshq))+ 
   geom_vline(xintercept = x_value, color = "black", linetype = "solid") +
   geom_hline(yintercept = y_value, color = "black", linetype = "solid") +
   #geom_text(data = WatershedBoundaries, aes(x = firerisk_normalized, y = huc_ndc, label = HUCID), vjust = -1.5, size = 2) +
-  #geom_text_repel(data = WatershedBoundaries, aes(x = firerisk_normalized, y = huc_ndc.x, label = HUCID), size = 2)+
+  geom_text_repel(data = WatershedBoundaries, aes(x = firerisk_normalized, y = huc_ndc, label = HUCID), size = 2)+
   theme_minimal()+
   scale_color_gradient(low = "#e8e8e8", high ="#c85a5a", name = "Potential % Area \nw/ Fire Resilience")+
   scale_y_continuous(labels = function(x) format(x, scientific = FALSE), trans = "log10")+
@@ -1682,4 +1249,176 @@ s <- ggplot()+
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
   theme(panel.border = element_rect(colour = "black", fill=NA))  
+```
+##Figure 4b and 4c
+```{r}
+selection <- WatershedBoundaries %>% 
+  filter(HUCID %in% c("16050201","18040012","18040010", "18040013", "18020126","18020129", "18020125", "18040008", "18030001", "16050102"))
+
+summary(selection$normVol)
+summary(selection$firerisk_normalized_Streamshq   )
+
+
+ndc_selection <- ggplot() +
+   # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = WatershedBoundaries, fill = NA, lwd = 0.1) +
+    geom_sf(data = selection, aes(fill = normVol), lwd = .6) +
+    scale_fill_gradient(low = "#e8e8e8", high = "#64abce", name = "Potential Water Storage \n(m3/km)")+
+    theme_minimal()+
+    #ggtitle(expression(paste("Potential Water Storage"))) +
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5),
+          legend.key.size = unit(1, "lines")) +
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(-.1,.20),
+          legend.title.align= 0.5)+
+    #labs(color = "dams/km", size=10)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+    theme(panel.grid.major = element_line(colour = "transparent")) +
+    theme(axis.text.x = element_blank(), axis.text.y = element_blank()) 
+   # theme(panel.border = element_rect(colour = "black", fill=NA))
+
+fire_selection <- ggplot() +
+   # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = WatershedBoundaries, fill = NA, lwd = 0.1) +
+    geom_sf(data = selection, aes(fill = firerisk_normalized_Streamshq), lwd = .6) +
+    scale_fill_gradient(low = "#e8e8e8", high ="#c85a5a", name = "Potential Fire Resilience \n(% of high risk areas)")+
+    theme_minimal()+
+    #ggtitle(expression(paste("Potential Fire Resilience"))) +
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5),
+          legend.key.size = unit(1, "lines")) +
+    theme(legend.text = element_text(size=8),
+          legend.title = element_text(size = 8),
+          legend.position = c(-.1,.20),
+          legend.title.align= 0.5)+
+    #labs(color = "dams/km", size=10)+
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+    theme(panel.grid.major = element_line(colour = "transparent")) +
+    theme(axis.text.x = element_blank(), axis.text.y = element_blank()) 
+   # theme(panel.border = element_rect(colour = "black", fill=NA))
+
+(ndc_selection + fire_selection)
+```
+##Figure 4 Layout
+```{r}
+
+layout <- "
+AA
+AA
+B#
+"
+scatter <- s + ndc_selection + fire_selection + 
+  plot_layout(design = layout) +    plot_annotation(tag_levels = 'A')
+  
+ggsave("Fig_scatter.png", plot = scatter, width = 6.34, height = 8, units = "in", bg = "white", dpi=900)
+
+
+layout <- "
+##
+##
+#C
+"
+scatter <-  fire_selection + 
+  plot_layout(design = layout) +    plot_annotation(tag_levels = list(LETTERS[3]))
+  
+ggsave("Fig_scatterC.png", plot = scatter, width = 6.34, height = 8, units = "in", bg = "white", dpi=900)
+```
+
+#LandOwnership
+##Select private land
+```{r}
+
+#Accordig to SMA metadata, "Undetermined" Category refers to non-federal land. There are separate designations for private and state land specifically that do not show up in this dataset, so we will assume all undetermined land is private land
+#https://www.arcgis.com/sharing/rest/content/items/6bf2e737c59d4111be92420ee5ab0b46/info/metadata/metadata.xml?format=default&output=html
+
+private <- landownership[landownership$ADMIN_UNIT=="Undetermined",]
+private <- private[!is.na(private$OBJECTID), ]
+
+pirvatemap <- ggplot() +
+  geom_sf(data = private, aes(fill = ADMIN_UNIT)) +
+  xlab(NULL)+
+  ylab(NULL)+
+  ggtitle(expression(paste("Private Land"))) + 
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5))+
+  theme(panel.border = element_rect(colour = "black", fill=NA))
+
+```
+
+##add private/other column
+```{r}
+landownership$desig <- ifelse(is.na(landownership$ADMIN_UNIT), "other",
+                              ifelse(landownership$ADMIN_UNIT == "Undetermined", "private", "other"))
+
+```
+
+
+##Supplementary Table S3
+```{r}
+#private
+#WatershedBoundaries
+#AllSierras_DamCapacity
+#highRisk_Streamshq
+
+#fire
+##Fire on private land
+private_fire <- crop(highRisk_Streamshq,private)
+private_fire <- mask(private_fire,private) #fire resilience on private land
+plot(highRisk_Streamshq)
+
+##Total fire on private land across region
+total_private_fire_npixels <- exact_extract(private_fire, private, 'count') #high resil fire pixels in private land
+total_private_fire_npixels <- sum(total_private_fire_npixels)
+total_private_fire_area <- total_private_fire_npixels*270*270  
+total_private_fire_areakm2 <- round(total_private_fire_area/1e6,2)
+
+##fire on private land by watershed
+WatershedBoundaries$private_fire_watershed_npixels <- exact_extract(private_fire, WatershedBoundaries, 'count') #high resil fire pixels in private land by watershed
+WatershedBoundaries$total_private_fire_watershed_area <- WatershedBoundaries$private_fire_watershed_npixels*270*270  
+WatershedBoundaries$total_private_fire_watershed_areakm2 <- round(WatershedBoundaries$total_private_fire_watershed_area/1e6,2)
+saveRDS(WatershedBoundaries,"WatershedBoundaries.rds")
+
+
+
+#water
+private_dams <- st_intersection(private, AllSierras_DamCapacity)
+private_dams_watersheds <- st_intersection(WatershedBoundaries, private_dams)
+saveRDS(private_dams,"private_dams.rds")
+saveRDS(private_dams_watersheds,"private_dams_watersheds.rds")
+
+private_dams_watersheds_df <- st_drop_geometry(private_dams_watersheds)
+  
+lo_dams <- private_dams_watersheds_df %>% 
+  group_by(HUCID) %>%
+  summarize(lo_water = sum(volume),
+            lo_damCt = sum(mCC_EX_CT),
+            lo_damCap = mean(oCC_EX),
+            lo_normVol = mean(VolumePerKm)) 
+
+
+
+#total area
+#WatershedBoundaries$total_area <- as.numeric(st_area(WatershedBoundaries))
+private_watersheds <- st_intersection(WatershedBoundaries,private)
+
+private_watersheds$total_area_private <- as.numeric(st_area(private_watersheds))
+
+test <- private_watersheds %>% 
+  group_by(HUCID) %>% 
+  summarize(total_area_private = sum(total_area_private))
+
+test <- st_drop_geometry(test)
+merged_df <- merge(test, lo_dams, by = "HUCID", all = TRUE)
+
+
+lo_dams_csv <- st_drop_geometry(merged_df)
+write.csv(lo_dams_csv, "lo_dams_csv.csv", row.names = TRUE)
+watershedboundaries_csv <- st_drop_geometry(WatershedBoundaries)
+write.csv(watershedboundaries_csv, "watershedboundaries_csv.csv", row.names = TRUE)
+
 ```

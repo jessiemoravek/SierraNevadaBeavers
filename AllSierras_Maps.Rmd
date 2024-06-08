@@ -1869,6 +1869,9 @@ map_w <- ggplot() +
 #Did this already with: 
 #WatershedBoundaries$bivmap <- exact_extract(bivmapQ2$fireStreams, WatershedBoundaries, 'frac')
 
+
+watershedboundaries_csv2 <- st_drop_geometry(WatershedBoundaries)
+write.csv(watershedboundaries_csv2, "watershedboundaries_csv2.csv", row.names = TRUE)
 ```
 
 ```{r}
@@ -2265,6 +2268,7 @@ map_b4 <- ggplot(data_long4, aes(x = HUCID_num, y = percentage, fill = variable)
 
 ggsave("barplot4.png", plot = map_b4, width = 4, height = 4.5, units = "in", dpi=300)
 
+write.csv(lo_dams_csv, "lo_dams_csv.csv", row.names = TRUE)
 
 ```
 ##Figure
@@ -2280,7 +2284,7 @@ map_q6 <- ggplot() +
     geom_sf(data = selection1, fill = NA, lwd = .55) +
     theme_classic() + theme(panel.grid.major = element_blank(),
                             panel.grid.minor = element_blank()) +
-    theme(text = element_text(size = 18, colour = "black")) +
+    theme(text = element_text(size = 12, colour = "black")) +
     borders(colour = "black", size = 0.1) +
     coord_sf() +
     theme(legend.position = "none",
