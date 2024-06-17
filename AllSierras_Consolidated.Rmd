@@ -180,6 +180,7 @@ saveRDS(AllSierras_DamCapacity,"AllSierras_DamCapacity_volume.rds")
 ```{r}
 sum(AllSierras_DamCapacity$volume)
 summary(AllSierras_DamCapacity$volume)
+sd(AllSierras_DamCapacity$volume)
 hist(AllSierras_DamCapacity$volume)
 sum(WatershedBoundaries$area_km2_Streamshq)
 summary(WatershedBoundaries$area_km2_Streamshq)
@@ -276,7 +277,7 @@ r <- ggplot() +
     geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(mCC_EXvHPE, breaks = c(0,.25,.5,.75,1,70), include.lowest=T)),aes(color = DamCapacity)) +
     geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
     scale_color_manual(values=palette_new,
-                        labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
+                        labels = c("0", "1 - 25%", "26 - 50%", "51 - 75%", "76 - 100+%", "NA"))+
     theme_minimal()+
     ggtitle(expression(paste("% Capacity Remaining"))) +
     theme(plot.title = element_text(hjust = 1, size = 12),
@@ -285,7 +286,7 @@ r <- ggplot() +
           legend.title = element_text(size = 8),
           legend.position = c(.2,.20))+
     #theme(element_text(size=10),legend.position = c(.15,.2))+
-    labs(color = "dams/km", size=10)+
+    labs(color = "% remaining", size=10)+
     theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())+
     theme(panel.grid.major = element_line(colour = "transparent")) +
