@@ -8,7 +8,7 @@ library(tidyverse)
 library(ggplot2)
 library(dplyr)
 library(dataRetrieval)
-library(ggsn)
+#library(ggsn)
 library(sf)
 library(maps)
 library(sp)
@@ -57,15 +57,15 @@ damCapacity2_centroid <- st_centroid(damCapacity2)
 damCapacity2_extract <- damCapacity2_centroid %>%
   dplyr::mutate(lon = sf::st_coordinates(.)[,1],
                 lat = sf::st_coordinates(.)[,2]) %>%
-  select(lon, lat, oCC_EX) %>%
+  select(lon, lat, oCC_EX, iGeo_ElMax, iGeo_ElMin, iGeo_Len, iGeo_Slope, iGeo_DA, iHyd_QLow, iHyd_Q2, iHyd_SPLow, iHyd_SP2) %>%
   st_drop_geometry()
 
 #Check what it looks like
 ggplot()+
-  geom_sf(data = damCapacity2_extract) #Thumbs up looks good 
+  geom_point(data = damCapacity2_extract, aes(x=lon, y = lat)) #Thumbs up looks good 
 
 #save as .txt
-write.table(damCapacity2_extract,"damCapacity_centroid.txt",sep="\t",row.names=FALSE, col.names=TRUE)
+write.table(damCapacity2_extract,"damCapacity_centroid_drainageArea.txt",sep="\t",row.names=FALSE, col.names=TRUE)
 
 ```
 
