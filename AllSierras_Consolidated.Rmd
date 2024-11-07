@@ -21,7 +21,7 @@ library(mapview)
 library(tidyterra)
 library(viridis)
 library(MetBrewer)
-library(stars)
+#library(stars)
 library(data.table)
 library(tigris)
 library(patchwork)
@@ -30,6 +30,7 @@ library(multcomp)
 library(exactextractr)
 library(scales)
 library(ggrepel)
+library(terra)
 ```
 
 #Input Files (all together)
@@ -58,7 +59,7 @@ private_dams <- readRDS("private_dams.rds")
 ##WatershedBoundaries
 ```{r}
 # Read in the shapefile with st_read()
-WatershedBoundaries <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/WatershedBoundaries5.shp")
+WatershedBoundaries <- st_read("C:/Users/morav042/Documents/SierraNevadaBeavers/WatershedBoundaries5.shp")
 
 #remove unneeded shapefiles
 file.remove(list.files(pattern = "WatershedBoundaries*",recursive = F))
@@ -73,7 +74,7 @@ saveRDS(WatershedBoundaries,"WatershedBoundaries.rds")
 ##LandOwnership
 ```{r}
 # Read in the shapefile with st_read()
-landownership <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/LandOwnership.shp")
+landownership <- st_read("C:/Users/morav042/Documents/SierraNevadaBeavers/LandOwnership.shp")
 
 #remove unneeded shapefiles
 file.remove(list.files(pattern = "LandOwnership*",recursive = F))
@@ -89,7 +90,7 @@ saveRDS(landownership,"landownership.rds")
 ##Dam Capacity
 ```{r}
 # Read in the shapefile with st_read()
-AllSierras_DamCapacity <- st_read("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/AllSierras_DamCapacity6.shp")
+AllSierras_DamCapacity <- st_read("C:/Users/morav042/Documents/SierraNevadaBeavers/AllSierras_DamCapacity6.shp")
 
 #remove unneeded shapefiles
 file.remove(list.files(pattern = "AllSierras_DamCapacity*",recursive = F))
@@ -337,7 +338,7 @@ ggsave("Fig_vegchange.png", plot = veg, width = 7, height = 4.32, units = "in", 
 #Fire Risk Continuous WHP data layer
 ```{r}
 #Read in the raster 
-contFireRisk <- rast("C:/Users/jessie_moravek/Desktop/SierraNevadaBeavers/FireRisk/FireRisk_4.tif")
+contFireRisk <- rast("C:/Users/morav042/Documents/SierraNevadaBeavers/FireRisk/FireRisk_4.tif")
 #plot(contFireRisk)
 contFireRisk <- project(contFireRisk, crs(AllSierras_DamCapacity))
 crs(contFireRisk) == crs(AllSierras_DamCapacity) #== crs(WatershedBoundaries)
