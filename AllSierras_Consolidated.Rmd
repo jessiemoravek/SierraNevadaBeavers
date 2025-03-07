@@ -1000,6 +1000,25 @@ map_q6 <- ggplot() +
           #axis.text = element_blank(),
           axis.title = element_blank())
 
+png("map_q9.png")
+ggplot() +
+    geom_tile(data = bivMapDFQ4, aes(x = x, y = y, fill = bivVal)) +
+      scale_fill_gradientn(colours = col.matrixQ4, na.value = "transparent") + 
+    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA, color = '#939393') +
+    #geom_sf(data = selection1, fill = NA, lwd = .55) +
+    theme_classic() + theme(panel.grid.major = element_blank(),
+                            panel.grid.minor = element_blank()) +
+    theme(text = element_text(size = 12, colour = "black")) +
+    borders(colour = "black", size = 0.1) +
+    coord_sf() +
+    theme(legend.position = "none",
+          plot.background = element_blank(),
+          strip.text = element_blank(), 
+          #axis.text.y = element_blank(),
+          #axis.text = element_blank(),
+          axis.title = element_blank())
+dev.off()
+
 map_q6 <- map_q6 + inset_element(BivLegend, 0, .1, 0.3, 0.2)
 
 ggsave("map_q6.png", plot = map_q6, width = 7.6, height = 4.69, units = "in", dpi = 300)
@@ -1168,7 +1187,7 @@ WatershedBoundaries <- readRDS('WatershedBoundaries.rds')
 firerisk_normalized_Streamshq_plot <- ggplot() +
    # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, aes(fill = (firerisk_normalized_Streamshq)), lwd = 0.1) +
-    scale_fill_gradient(low = "#e8e8e8", high ="#c85a5a", name = "% of High \nRisk Areas")+
+    scale_fill_gradient(low = "#e8e8e8", high ="#c85a5a", name = "% of High \nRisk Areas",labels = scales::percent, breaks=c(min(selection$firerisk_normalized_Streamshq),max(selection$firerisk_normalized_Streamshq)))+
     theme_minimal()+
     ggtitle(expression(paste("Potential Fire Resilience"))) +
     theme(plot.title = element_text(hjust = 0, size = 12),
@@ -1187,7 +1206,7 @@ firerisk_normalized_Streamshq_plot <- ggplot() +
 firerisk_plot <- ggplot() +
    # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, aes(fill = (firerisk_normalized_Streamshq)), lwd = 0.1) +
-    scale_fill_gradient(low = "#e8e8e8", high ="#FFA500", name = "% Area\nWHP>2000")+
+    scale_fill_gradient(low = "#e8e8e8", high ="#FFA500", name = "% Area\nWHP>2000",labels = scales::percent, breaks=c(min(selection$firerisk_normalized_Streamshq),max(selection$firerisk_normalized_Streamshq)))+
     theme_minimal()+
     ggtitle(expression(paste("Fire Risk"))) +
     theme(plot.title = element_text(hjust = 0, size = 12),
@@ -1205,7 +1224,7 @@ firerisk_plot <- ggplot() +
 normVol_plot <- ggplot() +
   geom_sf(data = WatershedBoundaries) +
   geom_sf(data = WatershedBoundaries, aes(fill = normVol), inherit.aes = FALSE) +
-  scale_fill_gradient(low = "#e8e8e8", high = "#64abce", name = "Potential Water \nStorage (m3/km)")+
+  scale_fill_gradient(low = "#e8e8e8", high = "#64abce", name = "Potential Water \nStorage (m3/km)",breaks=c(round(min(selection$normVol)),round(max(selection$normVol))))+
   xlab(NULL)+
   ylab(NULL)+
   ggtitle(expression(paste("Potential Water Storage"))) + 
@@ -1303,7 +1322,7 @@ ndc_selection <- ggplot() +
    # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, fill = NA, lwd = 0.1) +
     geom_sf(data = selection, aes(fill = normVol), lwd = .6) +
-    scale_fill_gradient(low = "#e8e8e8", high = "#64abce", name = "Potential Water Storage \n(m3/km)")+
+    scale_fill_gradient(low = "#e8e8e8", high = "#64abce", name = "Potential Water Storage \n(m3/km)", breaks=c(round(min(selection$normVol)),round(max(selection$normVol))))+
     theme_minimal()+
     #ggtitle(expression(paste("Potential Water Storage"))) +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
@@ -1320,11 +1339,12 @@ ndc_selection <- ggplot() +
     theme(axis.text.x = element_blank(), axis.text.y = element_blank()) 
    # theme(panel.border = element_rect(colour = "black", fill=NA))
 
+
 fire_selection <- ggplot() +
    # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, fill = NA, lwd = 0.1) +
     geom_sf(data = selection, aes(fill = firerisk_normalized_Streamshq), lwd = .6) +
-    scale_fill_gradient(low = "#e8e8e8", high ="#c85a5a", name = "Potential Fire Resilience \n(% of high risk areas)")+
+    scale_fill_gradient(low = "#e8e8e8", high ="#c85a5a", name = "Potential Fire Resilience \n(% of high risk areas)", labels = scales::percent, breaks=c(min(selection$firerisk_normalized_Streamshq),max(selection$firerisk_normalized_Streamshq)))+
     theme_minimal()+
     #ggtitle(expression(paste("Potential Fire Resilience"))) +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
@@ -1342,6 +1362,7 @@ fire_selection <- ggplot() +
    # theme(panel.border = element_rect(colour = "black", fill=NA))
 
 (ndc_selection + fire_selection)
+
 ```
 ##Figure 4 Layout
 ```{r}
@@ -1399,6 +1420,7 @@ landownership$desig <- ifelse(is.na(landownership$ADMIN_UNIT), "other",
 
 
 ##Supplementary Table S3
+###Takes a long time to run
 ```{r}
 #private
 #WatershedBoundaries
