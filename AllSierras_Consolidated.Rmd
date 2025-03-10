@@ -607,8 +607,8 @@ pct_fire_intermittent <- intermittent_fire/total_fire
 ```{r}
 # The function that produces the colour matrix
 colmat <- function(nbreaks = 3, breakstyle = "quantile",
-                   upperleft = "#64ACBE", upperright = "#574249", 
-                   bottomleft = "#E8E8E8", bottomright = "#C85A5A",
+                   upperleft = "#279dba", upperright = "#473239", 
+                   bottomleft = "#d4d4d4", bottomright = "#c94040",
                    xlab = "x label", ylab = "y label", plotLeg = TRUE,
                    saveLeg = FALSE) {
    # TODO - replace any tidyr, dplyr etc. functions with data.table #
@@ -843,10 +843,9 @@ nBreaks <- 2
 # Create the colour matrix
 col.matrixQ4 <- colmat(nbreaks = nBreaks, breakstyle = "quantile",
                        xlab = "Fire", ylab = "Water", 
-                      bottomright = "#C85A5A", upperright = "#574249",
-                       bottomleft = "#E8E8E8", upperleft = "#64ACBE",
+                      bottomright = "#c94040", upperright = "#473239",
+                       bottomleft = "#d4d4d4", upperleft = "#279dba",
                        saveLeg = TRUE, plotLeg = TRUE)
-
 
 # create the bivariate raster
 #if (!file.exists("bivmapQ.tif")) {
@@ -913,7 +912,7 @@ WatershedBoundaries$bivmap <- exact_extract(bivmapQ4$highRiskHighQual, Watershed
 WatershedBoundaries$bivmap_mode <- exact_extract(bivmapQ4$highRiskHighQual, WatershedBoundaries, 'mode')
 WatershedBoundaries$cat <- ifelse(WatershedBoundaries$bivmap_mode == 1,"neither",ifelse(WatershedBoundaries$bivmap_mode == 2,"water", ifelse(WatershedBoundaries$bivmap_mode == 5,"fire","both")))
 
-palette_biv2 <- colorRampPalette(colors = c("#574249", "#64ACBE", "#E8E8E8", "#C85A5A"))(4)
+palette_biv2 <- colorRampPalette(colors = c("#473239", "#279dba", "#d4d4d4", "#c94040"))(4)
 
 map_w <- ggplot() +
   geom_sf(data = WatershedBoundaries, aes(fill = cat), na.rm=T) +
@@ -957,10 +956,10 @@ bold_labels <-c("16050201","18040012","18040010", "18040013", "18020126","180201
 map_b4 <- ggplot(data_long4, aes(x = HUCID_num, y = percentage, fill = variable)) +
   geom_bar(stat = "identity") +
   scale_fill_manual(values = c(
-    "frac_1" = "#E8E8E8", 
-    'frac_2' = "#64ACBE", 
-    "frac_5" = "#C85A5A", 
-    "frac_6" = "#574249" 
+    "frac_1" = "#d4d4d4", 
+    'frac_2' = "#279dba", 
+    "frac_5" = "#c94040", 
+    "frac_6" = "#473239" 
     )) +
   labs(title = "Percentage of streams in each category",
        x = "HUC ID",
@@ -1028,7 +1027,7 @@ ggsave("map_q6.png", plot = map_q6, width = 7.6, height = 4.69, units = "in", dp
 ##Figure 5 Layout
 ```{r}
 library(Cairo)
-png(filename = "map_q6png.png", width = 7.6, height = 4.69, units = "in", type = "cairo", res = 800) 
+png(filename = "map_q6png.png", width = 7.6, height = 4.69, units = "in", type = "cairo", res = 1200) 
 map_q6
 dev.off()
 while (!is.null(dev.list()))  dev.off()
