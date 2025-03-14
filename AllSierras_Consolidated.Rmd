@@ -597,8 +597,8 @@ intermittent_fire <- sum(result_int$`area km^2`) #m
 total_fire <- sum(result$`area km^2`)
 pct_fire_intermittent <- intermittent_fire/total_fire 
 
-
-
+viridis(5)
+"#440154FF" "#3B528BFF" "#21908CFF" "#5DC863FF" "#FDE725FF"
 ```
 
 
