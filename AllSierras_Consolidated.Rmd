@@ -192,17 +192,22 @@ sum(AllSierras_DamCapacity$mCC_HPE_CT)
 #Descriptive Figures
 ##Figure 2 Inset
 ```{r}
+palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
 pal1 <- hcl.colors(5,"Zissou 1")
 pal2 <- hcl.colors(5,"viridis")
-pal3 <- hcl.colors(5,"plasma")
+pal3 <- (hcl.colors(5,"plasma"))
 colorspace::swatchplot(pal3, cvd = TRUE)
+pal4 <- colorRampPalette(colors = c("#FDE333","#53CC67", "#009B95", "#00588B","#000000"))(5)
+pal5 <- rev(hcl.colors(5,"inferno"))
+pal6 <- rev(hcl.colors(5, "Blue-Red 3"))
+hcl.pals(type = "sequential")
+colorspace::swatchplot(hcl.colors(5,"Red-Blue"), cvd = TRUE)
 
-palette_new <- colorRampPalette(colors = c("#ff0000", "#ffa500", "#ffff00", "#00FF50", "#4900FF"))(5)
 
 w <- ggplot() +
     geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, fill = "#b0b0b0", lwd = 0.1, alpha = 0.5 ) +
-    scale_color_manual(values=pal2)+
+    scale_color_manual(values=pal5)+
    # geom_sf_text(data = WatershedBoundaries, aes(label = HUCID)) + 
    #geom_sf_label_repel(data = WatershedBoundaries, aes(label = HUCID),  
                       #size = 3,  # Adjust text size
@@ -228,9 +233,9 @@ ggsave("Fig_watershedboundaries.png", plot = w, width = 6.8, height = 8, units =
 
 h <- ggplot() +
   # geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1) +
-  geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity = cut(oCC_HPE, breaks = c(0, .1, 2, 5, 15, 40), include.lowest = TRUE)), aes(color = DamCapacity)) +
-  geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
-  scale_color_manual(values = pal2, labels = c("0", "1-2", "2-5", "5-15", "15-40")) +
+  geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity = cut(oCC_HPE, breaks = c(0, .1, 2, 5, 15, 40), include.lowest = TRUE)), aes(color = DamCapacity), lwd= 0.3) +
+  geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA, color = "black") +
+  scale_color_manual(values = pal3, labels = c("0", "1-2", "2-5", "5-15", "15-40")) +
   theme_minimal() +
   ggtitle(expression(paste("Historical Dam Capacity"))) +
   theme(
@@ -255,9 +260,9 @@ h <- ggplot() +
 
 c <- ggplot() +
     #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
-    geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity)) +
-    geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
-    scale_color_manual(values=pal2,
+    geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(oCC_EX, breaks = c(0,.1,2,5,15,40), include.lowest=T)),aes(color = DamCapacity), lwd= 0.3) +
+   geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
+    scale_color_manual(values=pal3,
                         labels = c("0", "1-2", "2-5", "5-15", "15-40"))+
     theme_minimal()+
     ggtitle(expression(paste("Current Dam Capacity"))) +
@@ -280,9 +285,9 @@ c <- ggplot() +
 ```{r}
 r <- ggplot() +
     #geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
-    geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(mCC_EXvHPE, breaks = c(0,.25,.5,.75,1,70), include.lowest=T)),aes(color = DamCapacity)) +
+    geom_sf(data = transform(AllSierras_DamCapacity, DamCapacity=cut(mCC_EXvHPE, breaks = c(0,.25,.5,.75,1,70), include.lowest=T)),aes(color = DamCapacity), lwd=0.3) +
     geom_sf(data = WatershedBoundaries, lwd = 0.1, fill = NA) +
-    scale_color_manual(values=pal2,
+    scale_color_manual(values=pal3,
                         labels = c("0", "1 - 25%", "26 - 50%", "51 - 75%", "76 - 100+%", "NA"))+
     theme_minimal()+
     ggtitle(expression(paste("% Capacity Remaining"))) +
