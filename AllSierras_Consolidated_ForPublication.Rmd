@@ -1351,7 +1351,7 @@ WatershedBoundaries$total_private_fire_watershed_areakm2 <- round(WatershedBound
 
 
 #water
-private_dams <- st_intersection(private, AllSierras_DamCapacity)
+private_dams <- st_intersection(private, AllSierras_DamCapacity)#this is very slow, expect 2 hours
 private_dams_watersheds <- st_intersection(WatershedBoundaries, private_dams)
 
 private_dams_watersheds_df <- st_drop_geometry(private_dams_watersheds)
@@ -1362,7 +1362,8 @@ lo_dams <- private_dams_watersheds_df %>%
             lo_damCt = sum(mCC_EX_CT),
             lo_damCap = mean(oCC_EX),
             lo_normVol = mean(VolumePerKm)) 
-
+saveRDS(private_dams,"private_dams.rds")
+saveRDS(private_dams_watersheds,"private_dams_watersheds.rds")
 
 
 #total area
