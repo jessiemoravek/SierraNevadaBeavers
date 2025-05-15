@@ -898,9 +898,9 @@ map_b4 <- ggplot(data_long4, aes(x = HUCID_num, y = percentage, fill = variable)
     "frac_5" = "#c94040", 
     "frac_6" = "#473239" 
     )) +
-  labs(title = "Percentage of streams in each category",
+  labs(title = "Proportion of streams in each category",
        x = "HUC ID",
-       y = "Percentage") +
+       y = "Proportion") +
   theme_minimal()+
   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
   theme(panel.grid = element_blank())+
@@ -1208,12 +1208,12 @@ st <- ggplot()+
   geom_vline(xintercept = x_value, color = "black", linetype = "solid") +
   geom_hline(yintercept = y_value, color = "black", linetype = "solid") +
   theme_minimal()+
-  scale_color_gradient(low = "#e8e8e8", high ="#c85a5a", name = "Potential % Area \nw/ Fire Resilience")+
+  scale_color_gradient(low = "#e8e8e8", high ="#c85a5a", name = "Potential % Stream Area \nw/ Fire Resilience", labels = scales::percent,breaks=c(min(WatershedBoundaries$firerisk_normalized_Streamshq),max(WatershedBoundaries$firerisk_normalized_Streamshq)))+
   scale_y_continuous(labels = function(x) format(x, scientific = FALSE), trans = "log10")+
   ggtitle(expression(paste("Water Deficit vs. Fire Risk"))) +
   theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
-  labs(x = "% Watershed Area with High Fire Risk",
+  labs(x = "Porportion of Watershed Area with High Fire Risk",
        y = "Watershed-scale Water Deficit (NDC)", 
        size = "Potential Water \nStorage")+
   theme(panel.grid.major = element_blank(),
@@ -1300,8 +1300,7 @@ ggsave("Fig_scatterC.png", plot = scatter, width = 6.34, height = 8, units = "in
 ##Select private land
 ```{r}
 
-#Accordig to SMA metadata, "Undetermined" Category refers to non-federal land. There are separate designations for private and state land specifically that do not show up in this dataset, so we will assume all undetermined land is private land
-#https://www.arcgis.com/sharing/rest/content/items/6bf2e737c59d4111be92420ee5ab0b46/info/metadata/metadata.xml?format=default&output=html
+#Accordig to SMA metadata, "Undetermined" Category refers to non-federal land. There are separate designations for private and state land specifically that do not show up in this dataset, so we will assume all undetermined land is private land (https://www.arcgis.com/sharing/rest/content/items/6bf2e737c59d4111be92420ee5ab0b46/info/metadata/metadata.xml?format=default&output=html)
 
 private <- landownership[landownership$ADMIN_UNIT=="Undetermined",]
 private <- private[!is.na(private$OBJECTID), ]
@@ -1338,7 +1337,6 @@ landownership$desig <- ifelse(is.na(landownership$ADMIN_UNIT), "other",
 ##Fire on private land
 private_fire <- crop(highRisk_Streamshq,private)
 private_fire <- mask(private_fire,private) #fire resilience on private land
-plot(highRisk_Streamshq)
 
 ##Total fire on private land across region
 total_private_fire_npixels <- exact_extract(private_fire, private, 'count') #high resil fire pixels in private land
@@ -1350,15 +1348,11 @@ total_private_fire_areakm2 <- round(total_private_fire_area/1e6,2)
 WatershedBoundaries$private_fire_watershed_npixels <- exact_extract(private_fire, WatershedBoundaries, 'count') #high resil fire pixels in private land by watershed
 WatershedBoundaries$total_private_fire_watershed_area <- WatershedBoundaries$private_fire_watershed_npixels*270*270  
 WatershedBoundaries$total_private_fire_watershed_areakm2 <- round(WatershedBoundaries$total_private_fire_watershed_area/1e6,2)
-saveRDS(WatershedBoundaries,"WatershedBoundaries.rds")
-
 
 
 #water
 private_dams <- st_intersection(private, AllSierras_DamCapacity)
 private_dams_watersheds <- st_intersection(WatershedBoundaries, private_dams)
-saveRDS(private_dams,"private_dams.rds")
-saveRDS(private_dams_watersheds,"private_dams_watersheds.rds")
 
 private_dams_watersheds_df <- st_drop_geometry(private_dams_watersheds)
   
