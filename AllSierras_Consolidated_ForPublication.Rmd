@@ -1299,13 +1299,13 @@ ggsave("Fig_scatterC.png", plot = scatter, width = 6.34, height = 8, units = "in
 #LandOwnership
 ##Select private land
 ```{r}
-
 #Accordig to SMA metadata, "Undetermined" Category refers to non-federal land. There are separate designations for private and state land specifically that do not show up in this dataset, so we will assume all undetermined land is private land (https://www.arcgis.com/sharing/rest/content/items/6bf2e737c59d4111be92420ee5ab0b46/info/metadata/metadata.xml?format=default&output=html)
 
 private <- landownership[landownership$ADMIN_UNIT=="Undetermined",]
 private <- private[!is.na(private$OBJECTID), ]
 
-pirvatemap <- ggplot() +
+#Check on map
+privatemap <- ggplot() +
   geom_sf(data = private, aes(fill = ADMIN_UNIT)) +
   xlab(NULL)+
   ylab(NULL)+
@@ -1317,72 +1317,85 @@ pirvatemap <- ggplot() +
 
 ```
 
-##add private/other column
+##Add private/other column
 ```{r}
 landownership$desig <- ifelse(is.na(landownership$ADMIN_UNIT), "other",
                               ifelse(landownership$ADMIN_UNIT == "Undetermined", "private", "other"))
 
 ```
 
-
-##Supplementary Table S3
-###Takes a long time to run
+##Appendix 1: Table S4
 ```{r}
-#private
-#WatershedBoundaries
-#AllSierras_DamCapacity
-#highRisk_Streamshq
-
-#fire
-##Fire on private land
+#Fire
+##Fire resilience on private land
 private_fire <- crop(highRisk_Streamshq,private)
 private_fire <- mask(private_fire,private) #fire resilience on private land
 
-##Total fire on private land across region
+##Total area of fire resilience on private land
 total_private_fire_npixels <- exact_extract(private_fire, private, 'count') #high resil fire pixels in private land
 total_private_fire_npixels <- sum(total_private_fire_npixels)
 total_private_fire_area <- total_private_fire_npixels*270*270  
 total_private_fire_areakm2 <- round(total_private_fire_area/1e6,2)
 
-##fire on private land by watershed
+##Watershed area of fire resilience on private land
 WatershedBoundaries$private_fire_watershed_npixels <- exact_extract(private_fire, WatershedBoundaries, 'count') #high resil fire pixels in private land by watershed
 WatershedBoundaries$total_private_fire_watershed_area <- WatershedBoundaries$private_fire_watershed_npixels*270*270  
 WatershedBoundaries$total_private_fire_watershed_areakm2 <- round(WatershedBoundaries$total_private_fire_watershed_area/1e6,2)
+```
+
+##Appendix 1: Table S4 cont. 
+###Takes a very long time to run
+###To bypass use the saved "private_dams" and "private_dams_watersheds" .rds files
+```{r}
+#Bypass slow run times by using .rds files that are the result of the following chunk: 
+private_dams <- readRDS("private_dams.rds")
+private_dams_watersheds <- readRDS("private_dams_watersheds.rds")
 
 
-#water
+#Water/Dam capacity on private land
 private_dams <- st_intersection(private, AllSierras_DamCapacity)#this is very slow, expect 2 hours
 private_dams_watersheds <- st_intersection(WatershedBoundaries, private_dams)
-
 private_dams_watersheds_df <- st_drop_geometry(private_dams_watersheds)
   
+##Watershed water storate and dam capacity on private land 
 lo_dams <- private_dams_watersheds_df %>% 
   group_by(HUCID) %>%
-  summarize(lo_water = sum(volume),
-            lo_damCt = sum(mCC_EX_CT),
-            lo_damCap = mean(oCC_EX),
-            lo_normVol = mean(VolumePerKm)) 
+  summarize(private_water = sum(volume),
+            private_damCt = sum(mCC_EX_CT)) 
+
+
+#Save as .rds files to avoid running for 2 hrs
 saveRDS(private_dams,"private_dams.rds")
 saveRDS(private_dams_watersheds,"private_dams_watersheds.rds")
+```
 
-
+##Appendix 1: Table S4 cont. 2
+```{r}
 #total area
-#WatershedBoundaries$total_area <- as.numeric(st_area(WatershedBoundaries))
 private_watersheds <- st_intersection(WatershedBoundaries,private)
-
 private_watersheds$total_area_private <- as.numeric(st_area(private_watersheds))
 
-test <- private_watersheds %>% 
+#Area of private land by watershed
+privateArea <- private_watersheds %>% 
   group_by(HUCID) %>% 
   summarize(total_area_private = sum(total_area_private))
 
-test <- st_drop_geometry(test)
-merged_df <- merge(test, lo_dams, by = "HUCID", all = TRUE)
-
-
-lo_dams_csv <- st_drop_geometry(merged_df)
-write.csv(lo_dams_csv, "lo_dams_csv.csv", row.names = TRUE)
+#put it all together
+privateArea <- st_drop_geometry(privateArea)
+merged_df <- merge(privateArea, lo_dams, by = "HUCID", all = TRUE)
+merged_df <- st_drop_geometry(merged_df)
 watershedboundaries_csv <- st_drop_geometry(WatershedBoundaries)
-write.csv(watershedboundaries_csv, "watershedboundaries_csv.csv", row.names = TRUE)
+merged_df <- merge(merged_df, watershedboundaries_csv, by = "HUCID", all = TRUE)
+
+#Numbers for Table S4
+TableS4 <- merged_df %>% 
+  reframe(HUC = HUCID,
+          pct_private = total_area_private/total_area,
+          pct_dams = private_damCt/damCapCount, 
+          pct_water = private_water/totalVol,
+          pct_fire = total_private_fire_watershed_areakm2/area_km2_Streamshq)
+
+
+write.csv(TableS4, "TableS4.csv", row.names = TRUE)
 
 ```
