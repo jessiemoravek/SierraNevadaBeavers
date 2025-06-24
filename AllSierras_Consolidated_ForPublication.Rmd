@@ -62,6 +62,8 @@ background <- st_make_valid(background) %>%
 background <- background %>% filter(NAME == "California" | NAME == "Nevada" | NAME == "Oregon" | NAME == "Idaho" | NAME == "Utah" | NAME == "Arizona")
 background <- st_transform(background, 3310)
 
+saveRDS(background,"background.rds")
+
 ```
 
 ##Watershed Boundaries
