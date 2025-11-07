@@ -230,6 +230,28 @@ ggsave("Fig_watershedboundaries.png", plot = w, width = 6.8, height = 8, units =
 
 ```
 
+```{r}
+#Palette
+pal3 <- (hcl.colors(5,"plasma"))
+mono <- WatershedBoundaries[WatershedBoundaries$HUCID == 18090101,]
+
+#Watershed + State boundaries
+w <- ggplot() +
+    geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
+    geom_sf(data = WatershedBoundaries, fill = "#939393", lwd = 0.1, alpha = 0.5 ) +
+    geom_sf(data = mono, fill = "#3a3a3a", lwd = 0.1, alpha = 0.5 ) +
+    ggtitle(expression(paste("Watershed Boundaries"))) +
+    theme(plot.title = element_text(hjust = 0.5, size = 12),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())+
+    theme(panel.border = element_rect(colour = "black", fill=NA))+
+    theme_classic()
+
+ggsave("Fig_monolake.png", plot = w, width = 6.8, height = 8, units = "in", bg = "white", dpi=300)
+
+```
+
 ##Figure 2a: Historical Dam Capacity Map
 ```{r}
 h <- ggplot() +
