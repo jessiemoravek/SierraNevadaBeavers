@@ -983,6 +983,14 @@ ndc_cty <- left_join(counties, ndc, by = c("County","State"))
 WatershedBoundaries <- mutate(WatershedBoundaries, watershed_area = st_area(WatershedBoundaries))
 ndc_cty <- mutate(ndc_cty, county_area = st_area(ndc_cty))
 
+getwd()
+st_write(obj = ndc_cty, 
+         dsn = "C:/Users/morav042/Documents/SierraNevadaBeavers/SierraNevadaBeavers", 
+         layer = "WaterDeficit_County", 
+         driver = "ESRI Shapefile")
+
+
+
 # Re-run intersections and calculations to  calculate HUC ndc values (instead of by county)
 intersect_ndc <- st_intersection(WatershedBoundaries,ndc_cty) %>% 
   mutate(intersect_area = st_area(.)) %>% 
@@ -998,6 +1006,12 @@ intersect_ndc <- st_intersection(WatershedBoundaries,ndc_cty) %>%
 # Merge to watershed boundaries dataset
 WatershedBoundaries <- left_join(WatershedBoundaries, intersect_ndc, by = "HUCID")
 
+
+getwd()
+st_write(obj = WatershedBoundaries, 
+         dsn = "C:/Users/morav042/Documents/SierraNevadaBeavers/SierraNevadaBeavers", 
+         layer = "WaterDeficit_watershed", 
+         driver = "ESRI Shapefile")
 ```
 
 ##Double check results 
