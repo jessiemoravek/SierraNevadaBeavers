@@ -239,13 +239,13 @@ ggsave("Fig_watershedboundaries.png", plot = w, width = 6.8, height = 8, units =
 ```{r}
 #Palette
 pal3 <- (hcl.colors(5,"plasma"))
-mono <- WatershedBoundaries[WatershedBoundaries$HUCID == 18090101,]
+UpMerced <- WatershedBoundaries[WatershedBoundaries$HUCID == 18040008,]
 
 #Watershed + State boundaries
 w <- ggplot() +
     geom_sf(data = background, fill = "#dcdcdc", lwd = 0.1)+
     geom_sf(data = WatershedBoundaries, fill = "#939393", lwd = 0.1, alpha = 0.5 ) +
-    geom_sf(data = mono, fill = "#3a3a3a", lwd = 0.1, alpha = 0.5 ) +
+    geom_sf(data = UpMerced, fill = "#3a3a3a", lwd = 0.1, alpha = 0.5 ) +
     ggtitle(expression(paste("Watershed Boundaries"))) +
     theme(plot.title = element_text(hjust = 0.5, size = 12),
           plot.subtitle = element_text(hjust = 0.5)) +
@@ -254,7 +254,7 @@ w <- ggplot() +
     theme(panel.border = element_rect(colour = "black", fill=NA))+
     theme_classic()
 
-ggsave("Fig_monolake.png", plot = w, width = 6.8, height = 8, units = "in", bg = "white", dpi=300)
+ggsave("Fig_uppermerced.png", plot = w, width = 6.8, height = 8, units = "in", bg = "white", dpi=300)
 
 ```
 
@@ -416,6 +416,7 @@ riskExtract <- rast(riskExtract, type = 'xyz')
 wkt <- crs(contFireRisk)
 crs(riskExtract) <- wkt
 
+
 hq <- ggplot() +
   geom_spatraster(data = riskExtract, aes(fill = Band_1)) +
   scale_fill_viridis_c(option = "inferno",na.value = "transparent") +
@@ -432,6 +433,7 @@ result <- as.data.frame(riskExtract) %>%
   mutate(`area m^2` = pixels * 270 * 270, #multiply by pixel area
          `area km^2` = round(`area m^2`/1e6,2)) 
 
+writeRaster(x = riskExtract, filename = "riskExtract.tif", overwrite = TRUE)
 
 ```
 
